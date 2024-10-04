@@ -1,7 +1,12 @@
-import { createToken, Lexer, CstParser, tokenMatcher, ParserMethod, CstNode } from "chevrotain";
+import {
+  createToken,
+  Lexer,
+  CstParser,
+  tokenMatcher,
+  ParserMethod,
+  CstNode,
+} from "chevrotain";
 
-// using the NA pattern marks this Token class as 'irrelevant' for the Lexer.
-// AdditionOperator defines a Tokens hierarchy but only the leafs in this hierarchy define
 // actual Tokens that can appear in the text
 const AdditionOperator = createToken({
   name: "AdditionOperator",
@@ -22,11 +27,13 @@ const MultiplicationOperator = createToken({
   name: "MultiplicationOperator",
   pattern: Lexer.NA,
 });
+
 const Multi = createToken({
   name: "Multi",
   pattern: /\*/,
   categories: MultiplicationOperator,
 });
+
 const Div = createToken({
   name: "Div",
   pattern: /\//,
@@ -35,15 +42,19 @@ const Div = createToken({
 
 const LParen = createToken({ name: "LParen", pattern: /\(/ });
 const RParen = createToken({ name: "RParen", pattern: /\)/ });
+
 const NumberLiteral = createToken({
   name: "NumberLiteral",
-  pattern: /[1-9]\d*/,
+  pattern: /\d+/,
 });
 
-const PowerFunc = createToken({ name: "PowerFunc", pattern: /power/ });
+const FunctionName = createToken({
+  name: "FunctionName",
+  pattern: /[a-zA-Z_]\w*/,
+});
+
 const Comma = createToken({ name: "Comma", pattern: /,/ });
 
-// marking WhiteSpace as 'SKIPPED' makes the lexer skip it.
 const WhiteSpace = createToken({
   name: "WhiteSpace",
   pattern: /\s+/,
@@ -61,7 +72,7 @@ const allTokens = [
   NumberLiteral,
   AdditionOperator,
   MultiplicationOperator,
-  PowerFunc,
+  FunctionName,
   Comma,
 ];
 const CalculatorLexer = new Lexer(allTokens);
@@ -103,26 +114,29 @@ class CalculatorPure extends CstParser {
 
     $.RULE("atomicExpression", () =>
       $.OR([
-        // parenthesisExpression has the highest precedence and thus it appears
-        // in the "lowest" leaf in the expression ParseTree.
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
         { ALT: () => $.CONSUME(NumberLiteral) },
-        { ALT: () => $.SUBRULE($.powerFunction) },
+        { ALT: () => $.SUBRULE($.functionCall) }, // Add function calls here
       ])
     );
+
+    $.RULE("functionCall", () => {
+      $.SUBRULE($.functionName);
+      $.CONSUME(LParen);
+      $.MANY(() => {
+        $.SUBRULE($.expression);
+        $.OPTION(() => $.CONSUME(Comma)); // Handle multiple arguments
+      });
+      $.CONSUME(RParen);
+    });
+
+    $.RULE("functionName", () => {
+      $.CONSUME(FunctionName);
+    });
 
     $.RULE("parenthesisExpression", () => {
       $.CONSUME(LParen);
       $.SUBRULE($.expression);
-      $.CONSUME(RParen);
-    });
-
-    $.RULE("powerFunction", () => {
-      $.CONSUME(PowerFunc);
-      $.CONSUME(LParen);
-      $.SUBRULE($.expression, { LABEL: "base" });
-      $.CONSUME(Comma);
-      $.SUBRULE2($.expression, { LABEL: "exponent" });
       $.CONSUME(RParen);
     });
 
@@ -131,22 +145,28 @@ class CalculatorPure extends CstParser {
     // derived during the self analysis phase.
     this.performSelfAnalysis();
   }
-  additionExpression(additionExpression: ParserMethod<[additionExpression: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  functionName(): CstNode {
     throw new Error("Method not implemented.");
   }
-  multiplicationExpression(multiplicationExpression: ParserMethod<[multiplicationExpression: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  functionCall(): CstNode {
     throw new Error("Method not implemented.");
   }
-  atomicExpression(atomicExpression: ParserMethod<[atomicExpression: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  additionExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
-  parenthesisExpression(parenthesisExpression: ParserMethod<[parenthesisExpression: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  multiplicationExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
-  powerFunction(powerFunction: ParserMethod<[powerFunction: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  atomicExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
-  expression(expression?: ParserMethod<[expression: ParserMethod<[atomicExpression: any, arg1: { LABEL: string; }], CstNode>], CstNode>): CstNode {
+  parenthesisExpression(): CstNode {
+    throw new Error("Method not implemented.");
+  }
+  powerFunction(): CstNode {
+    throw new Error("Method not implemented.");
+  }
+  expression(): CstNode {
     throw new Error("Method not implemented.");
   }
 }
@@ -159,7 +179,9 @@ const parser = new CalculatorPure();
 const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 
 class CalculatorInterpreter extends BaseCstVisitor {
-  constructor() {
+  constructor(
+    private functions: Record<string, (...args: number[]) => number> = {}
+  ) {
     super();
     // This helper will detect any missing or redundant methods on this visitor
     this.validateVisitor();
@@ -174,18 +196,20 @@ class CalculatorInterpreter extends BaseCstVisitor {
 
     // "rhs" key may be undefined as the grammar defines it as optional (MANY === zero or more).
     if (ctx.rhs) {
-      ctx.rhs.forEach((rhsOperand: CstNode | CstNode[], idx: string | number) => {
-        // there will be one operator for each rhs operand
-        let rhsValue = this.visit(rhsOperand);
-        let operator = ctx.AdditionOperator[idx];
+      ctx.rhs.forEach(
+        (rhsOperand: CstNode | CstNode[], idx: string | number) => {
+          // there will be one operator for each rhs operand
+          let rhsValue = this.visit(rhsOperand);
+          let operator = ctx.AdditionOperator[idx];
 
-        if (tokenMatcher(operator, Plus)) {
-          result += rhsValue;
-        } else {
-          // Minus
-          result -= rhsValue;
+          if (tokenMatcher(operator, Plus)) {
+            result += rhsValue;
+          } else {
+            // Minus
+            result -= rhsValue;
+          }
         }
-      });
+      );
     }
 
     return result;
@@ -196,18 +220,20 @@ class CalculatorInterpreter extends BaseCstVisitor {
 
     // "rhs" key may be undefined as the grammar defines it as optional (MANY === zero or more).
     if (ctx.rhs) {
-      ctx.rhs.forEach((rhsOperand: CstNode | CstNode[], idx: string | number) => {
-        // there will be one operator for each rhs operand
-        let rhsValue = this.visit(rhsOperand);
-        let operator = ctx.MultiplicationOperator[idx];
+      ctx.rhs.forEach(
+        (rhsOperand: CstNode | CstNode[], idx: string | number) => {
+          // there will be one operator for each rhs operand
+          let rhsValue = this.visit(rhsOperand);
+          let operator = ctx.MultiplicationOperator[idx];
 
-        if (tokenMatcher(operator, Multi)) {
-          result *= rhsValue;
-        } else {
-          // Division
-          result /= rhsValue;
+          if (tokenMatcher(operator, Multi)) {
+            result *= rhsValue;
+          } else {
+            // Division
+            result /= rhsValue;
+          }
         }
-      });
+      );
     }
 
     return result;
@@ -221,8 +247,6 @@ class CalculatorInterpreter extends BaseCstVisitor {
     } else if (ctx.NumberLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return parseInt(ctx.NumberLiteral[0].image, 10);
-    } else if (ctx.powerFunction) {
-      return this.visit(ctx.powerFunction);
     }
   }
 
@@ -232,10 +256,26 @@ class CalculatorInterpreter extends BaseCstVisitor {
     return this.visit(ctx.expression);
   }
 
-  powerFunction(ctx: any) {
-    const base = this.visit(ctx.base);
-    const exponent = this.visit(ctx.exponent);
-    return Math.pow(base, exponent);
+  functionCall(ctx: any) {
+    const functionName = ctx.functionName[0].image; // Get the function name
+    const args = ctx.expression.map((arg: any) => this.visit(arg)); // Evaluate the arguments
+    const func = this.functions[functionName];
+
+    if (typeof func === "function") {
+      return func(...args); // Call the function with evaluated arguments
+    } else {
+      throw new Error(`Function ${functionName} is not defined.`);
+    }
+  }
+
+  // Define the functionName method
+  functionName(ctx: any) {
+    return ctx[0].image; // Get the function name from the context
+  }
+
+  // Example of adding a new function
+  addFunction(name: string, func: (...args: number[]) => number) {
+    this.functions[name] = func;
   }
 }
 

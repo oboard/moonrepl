@@ -141,10 +141,14 @@ const run = async () => {
 </script>
 
 <template>
-
     <!-- Bind the ref to the terminal div -->
-    <div ref="terminalRef"></div>
+    <div ref="terminalRef" class="w-screen h-screen">
 
+    </div>
 </template>
 
-<style></style>
+<style>
+.terminal {
+    padding: 1rem;
+}
+</style>

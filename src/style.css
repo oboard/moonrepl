@@ -9,6 +9,7 @@
 }
 
 body {
+  margin: 0;
   background-color: black;
-  padding: 1rem;
+  overflow: hidden;
 }
