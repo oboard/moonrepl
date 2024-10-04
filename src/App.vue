@@ -85,12 +85,28 @@ onMounted(() => {
             }
         };
 
-        term.onKey(e => {
-            const key = e.key;
 
+        // 自定义事件处理程序，允许 Ctrl+V/Cmd+V 粘贴
+        term.attachCustomKeyEventHandler((event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "v") {
+                return true; // 允许 Ctrl+V 或 Cmd+V 粘贴
+            }
+            return true; // 继续处理其他按键
+        });
+
+        // 捕获粘贴数据
+        term.onData((data) => {
+            const key = data;
             switch (key) {
                 case '\r': // 回车键
                     term.write('\r\n'); // 换行
+                    if (inputBuffer === 'clear') {
+                        term.clear();
+                        inputBuffer = ''; // 清空输入缓冲区
+                        cursorPosition = 0; // 重置光标位置
+                        writePrompt(); // 重新显示提示符
+                        break;
+                    }
                     try {
                         const result = vm.eval(inputBuffer); // 执行表达式
                         console.log(result);
@@ -106,7 +122,6 @@ onMounted(() => {
                     cursorPosition = 0; // 重置光标位置
                     writePrompt(); // 重新显示提示符
                     break;
-
                 case '\x7f': // 退格键
                     if (cursorPosition > 0) {
                         inputBuffer =
@@ -169,6 +184,11 @@ onMounted(() => {
                     break;
             }
         });
+
+        // term.onKey(e => {
+        //     const key = e.key;
+
+        // });
     }
 });
 
