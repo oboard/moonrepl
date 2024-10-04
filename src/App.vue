@@ -115,7 +115,12 @@ onMounted(() => {
                         refreshLine(); // 刷新当前行
                     }
                     break;
-
+                case '\x03': // Ctrl + C
+                    term.write('\r\n'); // 换行
+                    inputBuffer = ''; // 清空输入缓冲区
+                    cursorPosition = 0; // 重置光标位置
+                    writePrompt(); // 重新显示提示符
+                    break;
                 case '\u001b[D': // 左箭头键
                     if (cursorPosition > 0) {
                         cursorPosition--;
