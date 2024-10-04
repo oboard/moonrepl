@@ -62,7 +62,7 @@ onMounted(() => {
         window.addEventListener('resize', handleResize);
 
         // 输出彩色字符
-        term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ❤️ by oboard${RESET}`);
+        term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`);
 
         const writePrompt = () => {
             term.write(`${GREEN}❯ ${RESET}`); // 显示提示符
