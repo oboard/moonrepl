@@ -473,8 +473,8 @@ export class MoonBitVM {
 // const result1 = vm.eval("println(5)");
 // console.log(result1); // 输出 5
 
-const vm = new MoonBitVM();
-console.log(vm.eval("let mut x = 5")); // 输出 5
-vm.eval("x = 10");
-const result2 = vm.eval("x + 10"); // 应返回 20
-console.log(result2); // 输出 20
+// const vm = new MoonBitVM();
+// console.log(vm.eval("let mut x = 5")); // 输出 5
+// vm.eval("x = 10");
+// const result2 = vm.eval("x + 10"); // 应返回 20
+// console.log(result2); // 输出 20
