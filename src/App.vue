@@ -3,7 +3,9 @@ import { onMounted, onBeforeUnmount, ref } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import "@xterm/xterm/css/xterm.css";
-import { evaluateExpression } from './interpreter/index';
+import { MoonBitVM } from './interpreter/index';
+
+const vm = new MoonBitVM();
 
 // ANSI 转义码定义
 const RESET = "\x1b[0m";
@@ -50,7 +52,6 @@ const handleResize = () => {
         fitAddon.fit();
     }
 };
-
 onMounted(() => {
     if (terminalRef.value) {
         term.loadAddon(fitAddon);
@@ -71,6 +72,18 @@ onMounted(() => {
         let inputBuffer = ''; // 存储用户输入
         let history: string[] = []; // 历史记录
         let historyIndex = -1; // 当前历史记录索引
+        let cursorPosition = 0; // 光标位置
+
+        const refreshLine = () => {
+            term.write('\r\x1b[K'); // 清除当前行
+            writePrompt(); // 重新显示提示符
+            term.write(inputBuffer); // 显示当前输入
+            // 移动光标到正确的位置
+            const moveBack = inputBuffer.length - cursorPosition;
+            if (moveBack > 0) {
+                term.write(`\x1b[${moveBack}D`);
+            }
+        };
 
         term.onKey(e => {
             const key = e.key;
@@ -78,7 +91,7 @@ onMounted(() => {
             switch (key) {
                 case '\r': // 回车键
                     term.write('\r\n'); // 换行
-                    const result = evaluateExpression(inputBuffer); // 执行表达式
+                    const result = vm.eval(inputBuffer); // 执行表达式
                     console.log(result);
                     term.writeln(`${result}`); // 显示输入内容
                     if (inputBuffer) {
@@ -86,29 +99,45 @@ onMounted(() => {
                         historyIndex = history.length; // 重置历史索引
                     }
                     inputBuffer = ''; // 清空输入缓冲区
+                    cursorPosition = 0; // 重置光标位置
                     writePrompt(); // 重新显示提示符
                     break;
 
                 case '\x7f': // 退格键
-                    if (inputBuffer.length > 0) {
-                        inputBuffer = inputBuffer.slice(0, -1); // 移除最后一个字符
-                        term.write('\b \b'); // 在终端中显示退格效果
+                    if (cursorPosition > 0) {
+                        inputBuffer =
+                            inputBuffer.slice(0, cursorPosition - 1) + inputBuffer.slice(cursorPosition);
+                        cursorPosition--; // 光标向左移动一位
+                        refreshLine(); // 刷新当前行
+                    }
+                    break;
+
+                case '\u001b[D': // 左箭头键
+                    if (cursorPosition > 0) {
+                        cursorPosition--;
+                        term.write('\x1b[D'); // 光标向左移动
+                    }
+                    break;
+
+                case '\u001b[C': // 右箭头键
+                    if (cursorPosition < inputBuffer.length) {
+                        cursorPosition++;
+                        term.write('\x1b[C'); // 光标向右移动
                     }
                     break;
 
                 case '\u001b[B': // 下箭头键
-                    if (historyIndex <= history.length - 1) {
+                    if (historyIndex < history.length - 1) {
                         historyIndex++;
                         inputBuffer = history[historyIndex];
-                        term.write('\r\x1b[K'); // 清除当前行
-                        writePrompt(); // 重新显示提示符
-                        term.write(inputBuffer); // 显示历史记录内容
+                        cursorPosition = inputBuffer.length; // 将光标移到行尾
+                        refreshLine();
                     } else if (historyIndex == history.length) {
                         // 当处于最底端时清空输入框
                         historyIndex++;
                         inputBuffer = '';
-                        term.write('\r\x1b[K'); // 清除当前行
-                        writePrompt(); // 重新显示提示符
+                        cursorPosition = 0;
+                        refreshLine();
                     }
                     break;
 
@@ -116,15 +145,19 @@ onMounted(() => {
                     if (historyIndex > 0) {
                         historyIndex--;
                         inputBuffer = history[historyIndex];
-                        term.write('\r\x1b[K'); // 清除当前行
-                        writePrompt(); // 重新显示提示符
-                        term.write(inputBuffer); // 显示历史记录内容
+                        cursorPosition = inputBuffer.length; // 将光标移到行尾
+                        refreshLine();
                     }
                     break;
+
                 default:
                     if (key === undefined) break;
-                    inputBuffer += key; // 将按键添加到输入缓冲区
-                    term.write(key); // 回显输入
+                    // 插入字符到当前光标位置
+                    inputBuffer =
+                        inputBuffer.slice(0, cursorPosition) + key + inputBuffer.slice(cursorPosition);
+                    cursorPosition++; // 光标位置向右移动一位
+                    refreshLine(); // 刷新行
+                    break;
             }
         });
     }
@@ -134,10 +167,6 @@ onBeforeUnmount(() => {
     // 清理事件监听器
     window.removeEventListener('resize', handleResize);
 });
-
-const run = async () => {
-    // Add your code logic here
-};
 </script>
 
 <template>

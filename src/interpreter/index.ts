@@ -3,7 +3,6 @@ import {
   Lexer,
   CstParser,
   tokenMatcher,
-  ParserMethod,
   CstNode,
 } from "chevrotain";
 
@@ -50,7 +49,7 @@ const NumberLiteral = createToken({
 
 const FunctionName = createToken({
   name: "FunctionName",
-  pattern: /[a-zA-Z_]\w*/,
+  pattern: /[a-z_][a-zA-Z0-9_]*/,
 });
 
 const Comma = createToken({ name: "Comma", pattern: /,/ });
@@ -61,12 +60,30 @@ const WhiteSpace = createToken({
   group: Lexer.SKIPPED,
 });
 
+const Let = createToken({
+  name: "Let",
+  pattern: /let/,
+});
+const Equal = createToken({
+  name: "Equal",
+  pattern: /=/,
+});
+
+const LCurly = createToken({ name: "LCurly", pattern: /{/ });
+const RCurly = createToken({ name: "RCurly", pattern: /}/ });
+
+const Semicolon = createToken({ name: "Semicolon", pattern: /;/ });
+
 const allTokens = [
-  WhiteSpace, // whitespace is normally very common so it should be placed first to speed up the lexer's performance
+  WhiteSpace,
+  Let,
+  LCurly,
+  RCurly,
   Plus,
   Minus,
   Multi,
   Div,
+  Equal,
   LParen,
   RParen,
   NumberLiteral,
@@ -74,6 +91,7 @@ const allTokens = [
   MultiplicationOperator,
   FunctionName,
   Comma,
+  Semicolon,
 ];
 const CalculatorLexer = new Lexer(allTokens);
 
@@ -87,7 +105,27 @@ class CalculatorPure extends CstParser {
     const $ = this;
 
     $.RULE("expression", () => {
-      $.SUBRULE($.additionExpression);
+      $.OR([
+        { ALT: () => $.SUBRULE($.letStatement) },
+        { ALT: () => $.SUBRULE($.blockStatement) }, // Handle block statements
+        { ALT: () => $.SUBRULE($.additionExpression) },
+      ]);
+    });
+
+    $.RULE("blockStatement", () => {
+      $.CONSUME(LCurly);
+      $.MANY(() => {
+        $.SUBRULE($.expression); // Handle multiple expressions inside the block
+        $.OPTION(() => $.CONSUME(Semicolon)); // Optional semicolon
+      });
+      $.CONSUME(RCurly);
+    });
+
+    $.RULE("letStatement", () => {
+      $.CONSUME(Let);
+      $.SUBRULE($.functionName, { LABEL: "lhs" });
+      $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
+      $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
 
     //  lowest precedence thus it is first in the rule chain
@@ -117,6 +155,7 @@ class CalculatorPure extends CstParser {
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
         { ALT: () => $.CONSUME(NumberLiteral) },
         { ALT: () => $.SUBRULE($.functionCall) }, // Add function calls here
+        { ALT: () => $.SUBRULE($.functionName) }, // 处理变量名
       ])
     );
 
@@ -131,7 +170,7 @@ class CalculatorPure extends CstParser {
     });
 
     $.RULE("functionName", () => {
-      $.CONSUME(FunctionName);
+      $.CONSUME(FunctionName, { LABEL: "functionName" });
     });
 
     $.RULE("parenthesisExpression", () => {
@@ -149,6 +188,9 @@ class CalculatorPure extends CstParser {
     throw new Error("Method not implemented.");
   }
   functionCall(): CstNode {
+    throw new Error("Method not implemented.");
+  }
+  blockStatement(): CstNode {
     throw new Error("Method not implemented.");
   }
   additionExpression(): CstNode {
@@ -169,6 +211,9 @@ class CalculatorPure extends CstParser {
   expression(): CstNode {
     throw new Error("Method not implemented.");
   }
+  letStatement(): CstNode {
+    throw new Error("Method not implemented.");
+  }
 }
 
 // wrapping it all together
@@ -179,16 +224,49 @@ const parser = new CalculatorPure();
 const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 
 class CalculatorInterpreter extends BaseCstVisitor {
-  constructor(
-    private functions: Record<string, (...args: number[]) => number> = {}
-  ) {
+  scopes: Record<string, any>[] = [{}]; // Initialize with a global scope
+
+  constructor() {
     super();
     // This helper will detect any missing or redundant methods on this visitor
     this.validateVisitor();
   }
 
+  // 处理 let 声明
+
+  letStatement(ctx: any) {
+    // console.log("letStatement", ctx);
+    const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
+    const value = this.visit(ctx.rhs); // Evaluate expression
+    this.scopes[0][varName] = value; // Store variable in current scope
+    return value;
+  }
+
+  blockStatement(ctx: any) {
+    this.scopes.push({}); // Create a new scope
+    this.visit(ctx.expression); // Visit all expressions in the block
+    this.scopes.pop(); // Exit the scope
+  }
+
+  // Additional methods for handling variable lookups, etc.
+  getVariable(name: string) {
+    // console.log("getVariable", name, this.scopes);
+    for (let i = this.scopes.length - 1; i >= 0; i--) {
+      if (this.scopes[i][name] !== undefined) {
+        return this.scopes[i][name];
+      }
+    }
+    throw new Error(`Variable ${name} is not defined.`);
+  }
+
   expression(ctx: any) {
-    return this.visit(ctx.additionExpression);
+    if (ctx.letStatement) {
+      return this.visit(ctx.letStatement);
+    } else if (ctx.blockStatement) {
+      return this.visit(ctx.blockStatement);
+    } else if (ctx.additionExpression) {
+      return this.visit(ctx.additionExpression);
+    }
   }
 
   additionExpression(ctx: any) {
@@ -240,13 +318,21 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 
   atomicExpression(ctx: any) {
-    if (ctx.parenthesisExpression) {
+    if (ctx.functionName) {
+      const varName = ctx.functionName[0].children.functionName[0].image; // Get the variable name
+      return this.getVariable(varName);
+    } else if (ctx.parenthesisExpression) {
       // passing an array to "this.visit" is equivalent
       // to passing the array's first element
       return this.visit(ctx.parenthesisExpression);
     } else if (ctx.NumberLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return parseInt(ctx.NumberLiteral[0].image, 10);
+    } else if (ctx.functionCall) {
+      // If a key exists on the ctx, at least one element is guaranteed
+      return this.visit(ctx.functionCall);
+    } else {
+      console.log(ctx);
     }
   }
 
@@ -256,10 +342,30 @@ class CalculatorInterpreter extends BaseCstVisitor {
     return this.visit(ctx.expression);
   }
 
+  // Enter a new scope
+  enterScope() {
+    this.scopes.unshift({}); // Add a new scope at the beginning
+  }
+
+  // Exit the current scope
+  exitScope() {
+    this.scopes.shift(); // Remove the current scope
+  }
+
+  // Visit a function call
   functionCall(ctx: any) {
-    const functionName = ctx.functionName[0].image; // Get the function name
+    console.log(JSON.stringify(ctx, null, 2));
+    const functionName = ctx.functionName[0].children.functionName[0].image; // Get the function name
     const args = ctx.expression.map((arg: any) => this.visit(arg)); // Evaluate the arguments
-    const func = this.functions[functionName];
+
+    // Check the function in the current scope
+    let func = null;
+    for (const scope of this.scopes) {
+      if (functionName in scope) {
+        func = scope[functionName];
+        break;
+      }
+    }
 
     if (typeof func === "function") {
       return func(...args); // Call the function with evaluated arguments
@@ -268,27 +374,54 @@ class CalculatorInterpreter extends BaseCstVisitor {
     }
   }
 
+  // Example of adding a new function
+
+  // Add a function to the current scope
+  addFunction(name: string, func: (...args: any[]) => any) {
+    this.scopes[0][name] = func; // Add to the global scope (first scope)
+  }
   // Define the functionName method
   functionName(ctx: any) {
+    console.log(ctx);
     return ctx[0].image; // Get the function name from the context
   }
+}
 
-  // Example of adding a new function
-  addFunction(name: string, func: (...args: number[]) => number) {
-    this.functions[name] = func;
+export class MoonBitVM {
+  private interpreter: CalculatorInterpreter;
+
+  constructor() {
+    this.interpreter = new CalculatorInterpreter();
+
+    // 定义一些示例函数，例如 println
+    this.interpreter.addFunction("println", (...args: any[]) => {
+      console.log(...args);
+      return args[0];
+    });
+  }
+
+  // Evaluate an expression in the current scope
+  eval(input: string) {
+    const lexResult = CalculatorLexer.tokenize(input);
+    parser.input = lexResult.tokens;
+    const cst = parser.expression();
+    return this.interpreter.visit(cst);
   }
 }
 
-export function evaluateExpression(input: string) {
-  const lexResult = CalculatorLexer.tokenize(input);
-  parser.input = lexResult.tokens;
+// 使用示例
 
-  const cst = parser.expression();
-  const visitor = new CalculatorInterpreter();
+const vm = new MoonBitVM();
+const result1 = vm.eval("let x = 5");
+console.log(result1); // 输出 5
+const result2 = vm.eval("x + 10"); // 应返回 15
+console.log(result2); // 输出 15
 
-  return visitor.visit(cst);
-}
+// const vm = new MoonBitVM();
+// const result1 = vm.eval("1+1");
 
-// // 使用示例
-// const result = evaluateExpression("1 + 1");
-// console.log(result); // 输出 2
+// console.log(result1); // 输出 2
+
+// const vm = new MoonBitVM();
+// const result1 = vm.eval("println(5)");
+// console.log(result1); // 输出 5
