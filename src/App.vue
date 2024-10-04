@@ -21,29 +21,30 @@ const RED = "\x1b[31m";
 const terminalRef = ref<HTMLElement | null>(null);
 let term: Terminal = new Terminal({
     theme: {
-        foreground: '#ffffff', // 字体颜色
-        background: '#000000', // 背景颜色
-        cursor: '#ffffff', // 光标颜色
-        selectionBackground: '#ffffff', // 选中文本背景颜色
-        selectionForeground: '#000000', // 选中文本前景颜色
-        selectionInactiveBackground: '#ffffff', // 选中文本背景颜色
-        black: '#000000', // 黑色
-        red: '#ff0000', // 红色
-        green: '#00ff00', // 绿色
-        yellow: '#ffff00', // 黄色
-        blue: '#0000ff', // 蓝色
-        magenta: '#ff00ff', // 品红
-        cyan: '#00ffff', // 青色
-        white: '#ffffff', // 白色
-        brightBlack: '#808080', // 亮黑色
-        brightRed: '#ff8080', // 亮红色
-        brightGreen: '#80ff80', // 亮绿色
-        brightYellow: '#ffff80', // 亮黄色
-        brightBlue: '#8080ff', // 亮蓝色
-        brightMagenta: '#ff80ff', // 亮品红
-        brightCyan: '#80ffff', // 亮青色
-        brightWhite: '#ffffff' // 亮白色
-    }
+        foreground: '#dcdcdc', // 字体颜色（浅灰色）
+        background: '#2e3440', // 背景颜色（深灰蓝色）
+        cursor: '#d8dee9', // 光标颜色（浅灰蓝色）
+        selectionBackground: '#4c566a', // 选中文本背景颜色（中灰蓝色）
+        selectionForeground: '#eceff4', // 选中文本前景颜色（近乎白色）
+        selectionInactiveBackground: '#3b4252', // 非激活状态下的选中文本背景（更深的灰蓝色）
+        black: '#3b4252', // 黑色（深灰蓝色）
+        red: '#bf616a', // 红色（柔和的红色）
+        green: '#a3be8c', // 绿色（柔和的绿色）
+        yellow: '#ebcb8b', // 黄色（浅黄色）
+        blue: '#81a1c1', // 蓝色（柔和的蓝色）
+        magenta: '#b48ead', // 品红（淡紫色）
+        cyan: '#88c0d0', // 青色（柔和的青色）
+        white: '#e5e9f0', // 白色（浅灰色）
+        brightBlack: '#4c566a', // 亮黑色（稍亮的灰蓝色）
+        brightRed: '#d08770', // 亮红色（温暖的橙红色）
+        brightGreen: '#8fbcbb', // 亮绿色（浅青绿）
+        brightYellow: '#d8dee9', // 亮黄色（柔和的浅黄色）
+        brightBlue: '#5e81ac', // 亮蓝色（浅灰蓝色）
+        brightMagenta: '#a3be8c', // 亮品红（浅淡紫色）
+        brightCyan: '#81a1c1', // 亮青色（柔和的浅青色）
+        brightWhite: '#eceff4' // 亮白色（接近白色）
+    },
+    fontFamily: 'Menlo, courier-new, courier, monospace',
 });
 const fitAddon = new FitAddon();
 
