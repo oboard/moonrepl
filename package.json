@@ -10,8 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview",
-    "postinstall": "cp ./node_modules/@moonbit/moonbit-lsp/lsp-server.js ./public/lsp-server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
