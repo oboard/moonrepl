@@ -64,6 +64,10 @@ const Let = createToken({
   name: "Let",
   pattern: /let/,
 });
+const Mut = createToken({
+  name: "Mut",
+  pattern: /mut/,
+});
 const Equal = createToken({
   name: "Equal",
   pattern: /=/,
@@ -77,6 +81,7 @@ const Semicolon = createToken({ name: "Semicolon", pattern: /;/ });
 const allTokens = [
   WhiteSpace,
   Let,
+  Mut,
   LCurly,
   RCurly,
   Plus,
@@ -107,6 +112,7 @@ class CalculatorPure extends CstParser {
     $.RULE("expression", () => {
       $.OR([
         { ALT: () => $.SUBRULE($.letStatement) },
+        { ALT: () => $.SUBRULE($.assignmentStatement) }, // Handle assignment statements
         { ALT: () => $.SUBRULE($.blockStatement) }, // Handle block statements
         { ALT: () => $.SUBRULE($.additionExpression) },
       ]);
@@ -122,9 +128,16 @@ class CalculatorPure extends CstParser {
     });
 
     $.RULE("letStatement", () => {
-      $.CONSUME(Let);
+      $.CONSUME(Let); // 可选的 "mut" 关键字
+      $.OPTION(() => $.CONSUME(Mut)); // 可选的 "mut" 关键字
       $.SUBRULE($.functionName, { LABEL: "lhs" });
       $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
+      $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
+    });
+
+    $.RULE("assignmentStatement", () => {
+      $.SUBRULE($.functionName, { LABEL: "lhs" });
+      $.CONSUME(Equal); // 解析 "="
       $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
 
@@ -214,6 +227,9 @@ class CalculatorPure extends CstParser {
   letStatement(): CstNode {
     throw new Error("Method not implemented.");
   }
+  assignmentStatement(): CstNode {
+    throw new Error("Method not implemented.");
+  }
 }
 
 // wrapping it all together
@@ -232,13 +248,33 @@ class CalculatorInterpreter extends BaseCstVisitor {
     this.validateVisitor();
   }
 
+  assignmentStatement(ctx: any) {
+    // console.log("assignmentStatement", ctx);
+    const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
+    const value = this.visit(ctx.rhs); // Evaluate expression
+    const scope = this.getVariableScope(varName); // Get the variable scope
+    // 检查变量是否 writable
+    if (Object.getOwnPropertyDescriptor(scope, varName)?.writable === false) {
+      throw new Error(`Variable ${varName} is not writable.`);
+    }
+    scope[varName] = value; // Store variable in current scope
+    return value;
+  }
+
   // 处理 let 声明
 
   letStatement(ctx: any) {
-    // console.log("letStatement", ctx);
+    console.log("letStatement", ctx);
     const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
     const value = this.visit(ctx.rhs); // Evaluate expression
-    this.scopes[0][varName] = value; // Store variable in current scope
+
+    Object.defineProperty(this.scopes[0], varName, {
+      value,
+      writable: ctx.Mut !== undefined,
+      enumerable: true,
+      configurable: false,
+    });
+    // this.scopes[0][varName] = value; // Store variable in current scope
     return value;
   }
 
@@ -259,9 +295,20 @@ class CalculatorInterpreter extends BaseCstVisitor {
     throw new Error(`Variable ${name} is not defined.`);
   }
 
+  getVariableScope(varName: string) {
+    for (let i = this.scopes.length - 1; i >= 0; i--) {
+      if (varName in this.scopes[i]) {
+        return this.scopes[i];
+      }
+    }
+    throw new Error(`Variable ${varName} is not defined.`);
+  }
+
   expression(ctx: any) {
     if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
+    } else if (ctx.assignmentStatement) {
+      return this.visit(ctx.assignmentStatement);
     } else if (ctx.blockStatement) {
       return this.visit(ctx.blockStatement);
     } else if (ctx.additionExpression) {
@@ -354,7 +401,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
 
   // Visit a function call
   functionCall(ctx: any) {
-    console.log(JSON.stringify(ctx, null, 2));
+    // console.log(JSON.stringify(ctx, null, 2));
     const functionName = ctx.functionName[0].children.functionName[0].image; // Get the function name
     const args = ctx.expression.map((arg: any) => this.visit(arg)); // Evaluate the arguments
 
@@ -382,7 +429,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
   // Define the functionName method
   functionName(ctx: any) {
-    console.log(ctx);
+    // console.log(ctx);
     return ctx[0].image; // Get the function name from the context
   }
 }
@@ -411,11 +458,11 @@ export class MoonBitVM {
 
 // 使用示例
 
-const vm = new MoonBitVM();
-const result1 = vm.eval("let x = 5");
-console.log(result1); // 输出 5
-const result2 = vm.eval("x + 10"); // 应返回 15
-console.log(result2); // 输出 15
+// const vm = new MoonBitVM();
+// const result1 = vm.eval("let x = 5");
+// console.log(result1); // 输出 5
+// const result2 = vm.eval("x + 10"); // 应返回 15
+// console.log(result2); // 输出 15
 
 // const vm = new MoonBitVM();
 // const result1 = vm.eval("1+1");
@@ -425,3 +472,9 @@ console.log(result2); // 输出 15
 // const vm = new MoonBitVM();
 // const result1 = vm.eval("println(5)");
 // console.log(result1); // 输出 5
+
+const vm = new MoonBitVM();
+console.log(vm.eval("let mut x = 5")); // 输出 5
+vm.eval("x = 10");
+const result2 = vm.eval("x + 10"); // 应返回 20
+console.log(result2); // 输出 20
