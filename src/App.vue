@@ -11,7 +11,7 @@ const vm = new MoonBitVM();
 const RESET = "\x1b[0m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
-// const RED = "\x1b[31m";
+const RED = "\x1b[31m";
 // const BLUE = "\x1b[34m";
 // const MAGENTA = "\x1b[35m";
 // const CYAN = "\x1b[36m";
@@ -91,9 +91,13 @@ onMounted(() => {
             switch (key) {
                 case '\r': // 回车键
                     term.write('\r\n'); // 换行
-                    const result = vm.eval(inputBuffer); // 执行表达式
-                    console.log(result);
-                    term.writeln(`${result}`); // 显示输入内容
+                    try {
+                        const result = vm.eval(inputBuffer); // 执行表达式
+                        console.log(result);
+                        term.writeln(`${result}`); // 显示输入内容
+                    } catch (e) {
+                        term.writeln(`${RED}${e}${RESET}`); // 显示输入内容
+                    }
                     if (inputBuffer) {
                         history.push(inputBuffer); // 将输入内容添加到历史记录
                         historyIndex = history.length; // 重置历史索引
