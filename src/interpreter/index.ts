@@ -42,9 +42,25 @@ const Div = createToken({
 const LParen = createToken({ name: "LParen", pattern: /\(/ });
 const RParen = createToken({ name: "RParen", pattern: /\)/ });
 
+const StringLiteral = createToken({
+  name: "StringLiteral",
+  // pattern: /"(?:[^\\"]|\\(?:[bfnrtv"\\/]|u[0-9a-fA-F]{4}))*"/,
+  pattern: /"(?:[^"\\]|\\.)*"/, // 允许转义字符和普通字符
+});
+
 const NumberLiteral = createToken({
   name: "NumberLiteral",
   pattern: /\d+/,
+});
+
+const EscapeSequence = createToken({
+  name: "EscapeSequence",
+  pattern: /\\[nt"\\]/, // 处理常见的转义字符：\n, \t, \", \\
+});
+
+const DoubleQuote = createToken({
+  name: "DoubleQuote",
+  pattern: /"/,
 });
 
 const FunctionName = createToken({
@@ -175,6 +191,7 @@ const allTokens = [
   LParen,
   RParen,
   NumberLiteral,
+  StringLiteral,
   ComparisonOperator,
   AdditionOperator,
   MultiplicationOperator,
@@ -261,6 +278,7 @@ class CalculatorPure extends CstParser {
     $.RULE("atomicExpression", () =>
       $.OR([
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
+        { ALT: () => $.CONSUME(StringLiteral) },
         { ALT: () => $.CONSUME(NumberLiteral) },
         { ALT: () => $.SUBRULE($.functionCall) }, // Add function calls here
         { ALT: () => $.SUBRULE($.functionName) }, // 处理变量名
@@ -331,9 +349,6 @@ class CalculatorPure extends CstParser {
     throw new Error("Method not implemented.");
   }
   parenthesisExpression(): CstNode {
-    throw new Error("Method not implemented.");
-  }
-  powerFunction(): CstNode {
     throw new Error("Method not implemented.");
   }
   expression(): CstNode {
@@ -560,6 +575,35 @@ class CalculatorInterpreter extends BaseCstVisitor {
       // passing an array to "this.visit" is equivalent
       // to passing the array's first element
       return this.visit(ctx.parenthesisExpression);
+    } else if (ctx.StringLiteral) {
+      console.log(ctx.StringLiteral[0].image);
+      // 获取字符串值，去掉引号
+      let strValue: string = ctx.StringLiteral[0].image.slice(1, -1);
+
+      // 处理转义字符
+      strValue = strValue
+        .replace(/\\n/g, "\n")
+        .replace(/\\t/g, "\t")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, "\\");
+
+      // 处理模板字符串插值
+      const templateRegex = /\\{([^{}]*)}/g;
+
+      const parse = (input: string) => {
+        const lexResult = CalculatorLexer.tokenize(input);
+        parser.input = lexResult.tokens;
+        const cst = parser.expression();
+        return this.visit(cst);
+      };
+
+      strValue = strValue.replace(templateRegex, (_match, expression) => {
+        console.log("expression", expression);
+        const result = parse(expression);
+        return String(result);
+      });
+
+      return strValue;
     } else if (ctx.NumberLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return parseInt(ctx.NumberLiteral[0].image, 10);
@@ -679,3 +723,7 @@ export class MoonBitVM {
 
 // const vm = new MoonBitVM();
 // console.log(vm.eval("if 3 < 2 { 10 } else if 1 > 2 { 3 } else { 8 }")); // 输出 8
+
+// const vm = new MoonBitVM();
+// console.log(vm.eval('"haha"')); // 输出 haha
+// console.log(vm.eval('"ha\\{1+1}ha"')); // 输出 ha2ha
