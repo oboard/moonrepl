@@ -16,7 +16,7 @@ Progress:
 - [x] Strict Mode
 - [x] Template String
 - [ ] Types
-- [ ] If Statement
+- [x] If Statement
 - [ ] While Statement
 - [ ] For Statement
 - [ ] Match Statement
