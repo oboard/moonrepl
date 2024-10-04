@@ -151,12 +151,14 @@ const Equal = createToken({
 const LCurly = createToken({ name: "LCurly", pattern: /{/ });
 const RCurly = createToken({ name: "RCurly", pattern: /}/ });
 
-const Semicolon = createToken({ name: "Semicolon", pattern: /;/ });
+const Semicolon = createToken({ name: "Semicolon", pattern: /;|\n/ });
 
 const allTokens = [
   WhiteSpace,
   Let,
   Mut,
+  If,
+  Else,
   LCurly,
   RCurly,
   Plus,
@@ -176,8 +178,6 @@ const allTokens = [
   ComparisonOperator,
   AdditionOperator,
   MultiplicationOperator,
-  If,
-  Else,
   FunctionName,
   Comma,
   Semicolon,
@@ -289,20 +289,17 @@ class CalculatorPure extends CstParser {
 
     $.RULE("ifStatement", () => {
       $.CONSUME(If); // Consume the 'if' token
-      const condition = $.SUBRULE($.expression); // Parse the condition
-
-      // console.log(JSON.stringify(condition, null, 2));
-      $.CONSUME(LCurly);
+      $.SUBRULE($.comparisonExpression); // Parse the condition
       $.SUBRULE($.blockStatement); // Parse the 'then' block
-      $.CONSUME(RCurly);
-
       // Handle else if and else
 
       $.MANY(() => {
         $.CONSUME(Else); // Consume the 'else' token
         $.OR([
-          { ALT: () => $.SUBRULE2($.ifStatement) },
-          { ALT: () => $.SUBRULE2($.blockStatement) }, // Parse the else block
+          { ALT: () => $.SUBRULE($.ifStatement, { LABEL: "elseifStatement" }) },
+          {
+            ALT: () => $.SUBRULE2($.blockStatement, { LABEL: "elseStatement" }),
+          }, // Parse the else block
         ]);
       });
     });
@@ -370,28 +367,36 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 
   ifStatement(ctx: any) {
-    console.log("ifStatement", ctx);
-    const condition = this.visit(ctx.expression[0]); // Evaluate condition
+    // console.log("ifStatement", ctx);
+    const condition = this.visit(ctx.comparisonExpression); // Evaluate condition
     // console.log("condition", condition);
+    // return condition;
     if (condition) {
       // If the condition is true, evaluate the 'then' block
       return this.visit(ctx.blockStatement[0]);
     } else {
       // Check for else if or else
-      ctx.ifStatement?.forEach((elseIfCtx: any) => {
-        // console.log("elseIfCtx", elseIfCtx);
-        const elseIfCondition = this.visit(elseIfCtx.expression[0]); // Evaluate else if condition
-        if (elseIfCondition) {
-          // If else if condition is true, evaluate the 'else if' block
-          return this.visit(elseIfCtx.blockStatement[0]);
+      // ctx.ifStatement?.forEach((elseIfCtx: any) => {
+      if (ctx.elseifStatement) {
+        for (let i = 0; i < ctx.elseifStatement.length; i++) {
+          const elseIfCtx = ctx.elseifStatement[i].children;
+          console.log("elseIfCtx", elseIfCtx);
+          const elseIfCondition = this.visit(elseIfCtx.comparisonExpression[0]); // Evaluate else if condition
+          if (elseIfCondition) {
+            // If else if condition is true, evaluate the 'else if' block
+            return this.visit(elseIfCtx.blockStatement[0]);
+          }
+          if (elseIfCtx.elseStatement) {
+            return this.visit(elseIfCtx.elseStatement[0]);
+          }
         }
-      });
+      }
 
       // Finally, check for else block if exists
-      ctx.elseStatement?.forEach((elseCtx: any) => {
+      if (ctx.elseStatement) {
         // console.log("elseCtx", elseCtx);
-        return this.visit(elseCtx.blockStatement[0]);
-      });
+        return this.visit(ctx.elseStatement[0]);
+      }
     }
   }
 
@@ -427,9 +432,11 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 
   blockStatement(ctx: any) {
+    // console.log("blockStatement", ctx);
     this.scopes.push({}); // Create a new scope
-    this.visit(ctx.expression); // Visit all expressions in the block
+    const result = this.visit(ctx.expression[0]); // Visit all expressions in the block
     this.scopes.pop(); // Exit the scope
+    return result;
   }
 
   // Additional methods for handling variable lookups, etc.
@@ -455,6 +462,8 @@ class CalculatorInterpreter extends BaseCstVisitor {
   expression(ctx: any) {
     if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
+    } else if (ctx.ifStatement) {
+      return this.visit(ctx.ifStatement);
     } else if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement);
     } else if (ctx.blockStatement) {
@@ -662,6 +671,11 @@ export class MoonBitVM {
 // console.log(vm.eval("let mut x = 5")); // 输出 5
 // console.log(vm.eval("if x > 5 { 10 } else { 20 }")); // 输出 20
 
+// const vm = new MoonBitVM();
+// console.log(vm.eval("if 3 < 2 { 10 } else { 20 }")); // 输出 20
 
 // const vm = new MoonBitVM();
-// console.log(vm.eval("5 > 3")); // 输出 true
+// console.log(vm.eval("if 3 < 2 { 10 }")); // 输出 undefined
+
+// const vm = new MoonBitVM();
+// console.log(vm.eval("if 3 < 2 { 10 } else if 1 > 2 { 3 } else { 8 }")); // 输出 8

@@ -4,15 +4,19 @@ MoonBit Interpreter (Unofficial)
 
 Progress:
 
-- [x] Basic Expressions 
+- [x] Addition Expressions
+- [x] Subtraction Expressions
+- [x] Multiplication Expressions
+- [x] Division Expressions
+- [x] Comparison Expressions
 - [x] Let Statement
 - [x] Let Mut Statement
+- [] Types
 - [] If Statement
 - [] While Statement
 - [] For Statement
 - [] Match Statement
 - [] Match Expression
-- [] Types
 - [] Enum
 - [] Functions
 - [] Struct
