@@ -53,15 +53,15 @@ const NumberLiteral = createToken({
   pattern: /\d+/,
 });
 
-const EscapeSequence = createToken({
-  name: "EscapeSequence",
-  pattern: /\\[nt"\\]/, // 处理常见的转义字符：\n, \t, \", \\
-});
+// const EscapeSequence = createToken({
+//   name: "EscapeSequence",
+//   pattern: /\\[nt"\\]/, // 处理常见的转义字符：\n, \t, \", \\
+// });
 
-const DoubleQuote = createToken({
-  name: "DoubleQuote",
-  pattern: /"/,
-});
+// const DoubleQuote = createToken({
+//   name: "DoubleQuote",
+//   pattern: /"/,
+// });
 
 const FunctionName = createToken({
   name: "FunctionName",

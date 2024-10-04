@@ -14,12 +14,10 @@
     "postinstall": "cp ./node_modules/@moonbit/moonbit-lsp/lsp-server.js ./public/lsp-server.js"
   },
   "dependencies": {
-    "@moonbit/moonbit-lsp": "^0.1.202409140",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "chevrotain": "^11.0.3",
     "marked": "^14.1.2",
-    "monaco-editor": "^0.51.0",
     "vue": "^3.5.5"
   },
   "devDependencies": {
