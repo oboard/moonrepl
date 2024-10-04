@@ -167,10 +167,11 @@ const Equal = createToken({
 const LCurly = createToken({ name: "LCurly", pattern: /{/ });
 const RCurly = createToken({ name: "RCurly", pattern: /}/ });
 
-const Semicolon = createToken({ name: "Semicolon", pattern: /;|\n/ });
+const Semicolon = createToken({ name: "Semicolon", pattern: /;/ });
 
 const allTokens = [
   WhiteSpace,
+  Semicolon,
   Let,
   Mut,
   If,
@@ -197,7 +198,6 @@ const allTokens = [
   MultiplicationOperator,
   FunctionName,
   Comma,
-  Semicolon,
 ];
 const CalculatorLexer = new Lexer(allTokens);
 
@@ -209,6 +209,13 @@ class CalculatorPure extends CstParser {
     super(allTokens);
 
     const $ = this;
+
+    $.RULE("row", () => {
+      $.MANY(() => {
+        $.SUBRULE($.expression);
+        $.OPTION(() => $.CONSUME(Semicolon));
+      });
+    });
 
     // 这里修改之后，expression函数中的判断也要同步修改
     $.RULE("expression", () => {
@@ -351,6 +358,9 @@ class CalculatorPure extends CstParser {
   parenthesisExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
+  row(): CstNode {
+    throw new Error("Method not implemented.");
+  }
   expression(): CstNode {
     throw new Error("Method not implemented.");
   }
@@ -419,12 +429,14 @@ class CalculatorInterpreter extends BaseCstVisitor {
     // console.log("assignmentStatement", ctx);
     const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
     const value = this.visit(ctx.rhs); // Evaluate expression
-    const scope = this.getVariableScope(varName); // Get the variable scope
+    const scope = this.getVariableScope(varName) ?? this.scopes[0]; // Get the variable scope
+
     // 检查变量是否 writable
     if (Object.getOwnPropertyDescriptor(scope, varName)?.writable === false) {
-      throw new Error(`Variable ${varName} is not writable.`);
+      throw new Error(`Variable ${varName} is not mutable.`);
     }
     scope[varName] = value; // Store variable in current scope
+
     return value;
   }
 
@@ -440,7 +452,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
       value,
       writable: ctx.Mut !== undefined,
       enumerable: true,
-      configurable: false,
+      configurable: true,
     });
     // this.scopes[0][varName] = value; // Store variable in current scope
     return value;
@@ -471,7 +483,19 @@ class CalculatorInterpreter extends BaseCstVisitor {
         return this.scopes[i];
       }
     }
-    throw new Error(`Variable ${varName} is not defined.`);
+    if (strictMode) {
+      throw new Error(`Variable ${varName} is not defined.`);
+    }
+  }
+
+  row(ctx: any) {
+    console.log("row", ctx);
+    const length = ctx.expression.length;
+    for (let i = 0; i < length - 1; i++) {
+      this.visit(ctx.expression[i]);
+    }
+    console.log(length);
+    return this.visit(ctx.expression[length - 1]);
   }
 
   expression(ctx: any) {
@@ -666,7 +690,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 }
 
-export class MoonBitVM {
+class MoonBitVM {
   private interpreter: CalculatorInterpreter;
 
   constructor() {
@@ -683,10 +707,12 @@ export class MoonBitVM {
   eval(input: string) {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
-    const cst = parser.expression();
+    const cst = parser.row();
     return this.interpreter.visit(cst);
   }
 }
+
+let strictMode = false;
 
 // 使用示例
 
@@ -727,3 +753,5 @@ export class MoonBitVM {
 // const vm = new MoonBitVM();
 // console.log(vm.eval('"haha"')); // 输出 haha
 // console.log(vm.eval('"ha\\{1+1}ha"')); // 输出 ha2ha
+
+export { MoonBitVM, strictMode };
