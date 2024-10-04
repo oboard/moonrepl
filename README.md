@@ -2,6 +2,8 @@
 
 MoonBit Interpreter (Unofficial)
 
+![MoonRepl Preview Image](screenshots/1.png)
+
 Progress:
 
 - [x] Addition Expressions
@@ -11,12 +13,14 @@ Progress:
 - [x] Comparison Expressions
 - [x] Let Statement
 - [x] Let Mut Statement
-- [] Types
-- [] If Statement
-- [] While Statement
-- [] For Statement
-- [] Match Statement
-- [] Match Expression
-- [] Enum
-- [] Functions
-- [] Struct
+- [x] Strict Mode
+- [x] Template String
+- [ ] Types
+- [ ] If Statement
+- [ ] While Statement
+- [ ] For Statement
+- [ ] Match Statement
+- [ ] Match Expression
+- [ ] Enum
+- [ ] Functions
+- [ ] Struct
