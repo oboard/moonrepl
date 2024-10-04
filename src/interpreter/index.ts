@@ -51,6 +51,81 @@ const FunctionName = createToken({
   name: "FunctionName",
   pattern: /[a-z_][a-zA-Z0-9_]*/,
 });
+const If = createToken({
+  name: "If",
+  pattern: /if/,
+});
+
+const ComparisonOperator = createToken({
+  name: "ComparisonOperator",
+  pattern: Lexer.NA,
+});
+
+const Else = createToken({
+  name: "Else",
+  pattern: /else/,
+});
+const GreaterThan = createToken({
+  name: "GreaterThan",
+  pattern: />/,
+  categories: ComparisonOperator,
+});
+
+const LessThan = createToken({
+  name: "LessThan",
+  pattern: /</,
+  categories: ComparisonOperator,
+});
+
+const EqualEqual = createToken({
+  name: "EqualEqual",
+  pattern: /==/,
+  categories: ComparisonOperator,
+});
+
+const GreaterThanOrEqual = createToken({
+  name: "GreaterThanOrEqual",
+  pattern: />=/,
+  categories: ComparisonOperator,
+});
+
+const LessThanOrEqual = createToken({
+  name: "LessThanOrEqual",
+  pattern: /<=/,
+  categories: ComparisonOperator,
+});
+
+const NotEqual = createToken({
+  name: "NotEqual",
+  pattern: /!=/,
+  categories: ComparisonOperator,
+});
+
+// const And = createToken({
+//   name: "And",
+//   pattern: /&&/,
+//   ca
+// });
+
+// const Or = createToken({
+//   name: "Or",
+//   pattern: /\|\|/,
+// });
+
+// const Not = createToken({
+//   name: "Not",
+//   pattern: /!/,
+// });
+
+// const True = createToken({
+//   name: "True",
+//   pattern: /true/,
+// });
+
+// const False = createToken({
+//   name: "False",
+//   pattern: /false/,
+// });
 
 const Comma = createToken({ name: "Comma", pattern: /,/ });
 
@@ -88,12 +163,21 @@ const allTokens = [
   Minus,
   Multi,
   Div,
+  GreaterThanOrEqual,
+  LessThanOrEqual,
+  EqualEqual,
+  GreaterThan,
+  LessThan,
+  NotEqual,
   Equal,
   LParen,
   RParen,
   NumberLiteral,
+  ComparisonOperator,
   AdditionOperator,
   MultiplicationOperator,
+  If,
+  Else,
   FunctionName,
   Comma,
   Semicolon,
@@ -109,13 +193,24 @@ class CalculatorPure extends CstParser {
 
     const $ = this;
 
+    // 这里修改之后，expression函数中的判断也要同步修改
     $.RULE("expression", () => {
       $.OR([
         { ALT: () => $.SUBRULE($.letStatement) },
+        { ALT: () => $.SUBRULE($.ifStatement) }, // Handle if statements
         { ALT: () => $.SUBRULE($.assignmentStatement) }, // Handle assignment statements
-        { ALT: () => $.SUBRULE($.blockStatement) }, // Handle block statements
-        { ALT: () => $.SUBRULE($.additionExpression) },
+        { ALT: () => $.SUBRULE($.comparisonExpression) }, // Handle comparison expressions
       ]);
+    });
+
+    $.RULE("comparisonExpression", () => {
+      $.SUBRULE($.additionExpression, { LABEL: "lhs" });
+      $.MANY(() => {
+        // consuming 'AdditionOperator' will consume either Plus or Minus as they are subclasses of AdditionOperator
+        $.CONSUME(ComparisonOperator);
+        //  the index "2" in SUBRULE2 is needed to identify the unique position in the grammar during runtime
+        $.SUBRULE2($.additionExpression, { LABEL: "rhs" });
+      });
     });
 
     $.RULE("blockStatement", () => {
@@ -192,6 +287,26 @@ class CalculatorPure extends CstParser {
       $.CONSUME(RParen);
     });
 
+    $.RULE("ifStatement", () => {
+      $.CONSUME(If); // Consume the 'if' token
+      const condition = $.SUBRULE($.expression); // Parse the condition
+
+      // console.log(JSON.stringify(condition, null, 2));
+      $.CONSUME(LCurly);
+      $.SUBRULE($.blockStatement); // Parse the 'then' block
+      $.CONSUME(RCurly);
+
+      // Handle else if and else
+
+      $.MANY(() => {
+        $.CONSUME(Else); // Consume the 'else' token
+        $.OR([
+          { ALT: () => $.SUBRULE2($.ifStatement) },
+          { ALT: () => $.SUBRULE2($.blockStatement) }, // Parse the else block
+        ]);
+      });
+    });
+
     // very important to call this after all the rules have been defined.
     // otherwise the parser may not work correctly as it will lack information
     // derived during the self analysis phase.
@@ -212,6 +327,9 @@ class CalculatorPure extends CstParser {
   multiplicationExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
+  comparisonExpression(): CstNode {
+    throw new Error("Method not implemented.");
+  }
   atomicExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
@@ -222,6 +340,9 @@ class CalculatorPure extends CstParser {
     throw new Error("Method not implemented.");
   }
   expression(): CstNode {
+    throw new Error("Method not implemented.");
+  }
+  ifStatement(): CstNode {
     throw new Error("Method not implemented.");
   }
   letStatement(): CstNode {
@@ -248,6 +369,32 @@ class CalculatorInterpreter extends BaseCstVisitor {
     this.validateVisitor();
   }
 
+  ifStatement(ctx: any) {
+    console.log("ifStatement", ctx);
+    const condition = this.visit(ctx.expression[0]); // Evaluate condition
+    // console.log("condition", condition);
+    if (condition) {
+      // If the condition is true, evaluate the 'then' block
+      return this.visit(ctx.blockStatement[0]);
+    } else {
+      // Check for else if or else
+      ctx.ifStatement?.forEach((elseIfCtx: any) => {
+        // console.log("elseIfCtx", elseIfCtx);
+        const elseIfCondition = this.visit(elseIfCtx.expression[0]); // Evaluate else if condition
+        if (elseIfCondition) {
+          // If else if condition is true, evaluate the 'else if' block
+          return this.visit(elseIfCtx.blockStatement[0]);
+        }
+      });
+
+      // Finally, check for else block if exists
+      ctx.elseStatement?.forEach((elseCtx: any) => {
+        // console.log("elseCtx", elseCtx);
+        return this.visit(elseCtx.blockStatement[0]);
+      });
+    }
+  }
+
   assignmentStatement(ctx: any) {
     // console.log("assignmentStatement", ctx);
     const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
@@ -264,9 +411,10 @@ class CalculatorInterpreter extends BaseCstVisitor {
   // 处理 let 声明
 
   letStatement(ctx: any) {
-    console.log("letStatement", ctx);
+    // console.log("letStatement", ctx);
     const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
     const value = this.visit(ctx.rhs); // Evaluate expression
+    // console.log("value", value);
 
     Object.defineProperty(this.scopes[0], varName, {
       value,
@@ -311,8 +459,8 @@ class CalculatorInterpreter extends BaseCstVisitor {
       return this.visit(ctx.assignmentStatement);
     } else if (ctx.blockStatement) {
       return this.visit(ctx.blockStatement);
-    } else if (ctx.additionExpression) {
-      return this.visit(ctx.additionExpression);
+    } else if (ctx.comparisonExpression) {
+      return this.visit(ctx.comparisonExpression);
     }
   }
 
@@ -337,6 +485,37 @@ class CalculatorInterpreter extends BaseCstVisitor {
       );
     }
 
+    return result;
+  }
+
+  comparisonExpression(ctx: any) {
+    let result = this.visit(ctx.lhs);
+    // console.log("comparisonExpression", ctx, result);
+    // "rhs" key may be undefined as the grammar defines it as optional (MANY === zero or more).
+    if (ctx.rhs) {
+      ctx.rhs.forEach(
+        (rhsOperand: CstNode | CstNode[], idx: string | number) => {
+          // there will be one operator for each rhs operand
+          let rhsValue = this.visit(rhsOperand);
+          let operator = ctx.ComparisonOperator[idx];
+
+          if (tokenMatcher(operator, GreaterThan)) {
+            result = result > rhsValue;
+          } else if (tokenMatcher(operator, LessThan)) {
+            result = result < rhsValue;
+          } else if (tokenMatcher(operator, EqualEqual)) {
+            result = result === rhsValue;
+          } else if (tokenMatcher(operator, NotEqual)) {
+            result = result !== rhsValue;
+          } else if (tokenMatcher(operator, GreaterThanOrEqual)) {
+            result = result >= rhsValue;
+          } else if (tokenMatcher(operator, LessThanOrEqual)) {
+            result = result <= rhsValue;
+          }
+        }
+      );
+    }
+    // console.log("result", result);
     return result;
   }
 
@@ -478,3 +657,11 @@ export class MoonBitVM {
 // vm.eval("x = 10");
 // const result2 = vm.eval("x + 10"); // 应返回 20
 // console.log(result2); // 输出 20
+
+// const vm = new MoonBitVM();
+// console.log(vm.eval("let mut x = 5")); // 输出 5
+// console.log(vm.eval("if x > 5 { 10 } else { 20 }")); // 输出 20
+
+
+// const vm = new MoonBitVM();
+// console.log(vm.eval("5 > 3")); // 输出 true
