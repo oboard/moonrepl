@@ -1,5 +1,5 @@
 class MoonBitType {
-  static matchType(value: any): MoonBitType {
+  static matchTypeFromValue(value: any): MoonBitType {
     if (value === undefined) {
       return MoonBitType.Unit;
     } else if (typeof value === "number") {
@@ -28,7 +28,7 @@ class MoonBitType {
     this.name = name;
   }
 
-  static match(strType: string) {
+  static matchFromTypeName(strType: string) {
     switch (strType) {
       case "Unit":
         return MoonBitType.Unit;
@@ -49,7 +49,7 @@ class MoonBitType {
     }
   }
 
-  static checkWithError(value: any, type: MoonBitType) {
+  static checkValueTypeWithError(value: any, type: MoonBitType) {
     if (value instanceof MoonBitValue && type !== value.type) {
       throw new Error(
         `Type mismatch: expected ${type}, got ${value.type}`
@@ -77,7 +77,7 @@ class MoonBitValue {
 
   constructor(value: any, type?: MoonBitType) {
     if (type === undefined) {
-      this.type = MoonBitType.matchType(value);
+      this.type = MoonBitType.matchTypeFromValue(value);
     } else {
       this.type = type;
     }

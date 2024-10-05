@@ -15,6 +15,12 @@ class MoonBitFunction extends MoonBitValue {
     this.args = args;
     this.returnType = returnType;
   }
+
+  toString() {
+    return `[(${this.args.map((arg) => arg.type.name).join(",")}) -> ${
+      this.returnType.name
+    }]`;
+  }
 }
 
 class MoonBitArgument {
@@ -26,6 +32,5 @@ class MoonBitArgument {
     this.type = type;
   }
 }
-
 
 export { MoonBitFunction, MoonBitArgument };

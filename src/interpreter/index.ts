@@ -267,14 +267,11 @@ class MoonBitPure extends CstParser {
     });
 
     $.RULE("argumentStatement", () => {
-      $.MANY(() => [
-        $.OPTION(() => $.CONSUME(NamedArgument)),
-        $.SUBRULE($.functionName, { LABEL: "name" }),
-        $.OPTION2(() => $.CONSUME(OptionalArgument)),
-        $.CONSUME(Colon),
-        $.SUBRULE2($.typeName, { LABEL: "type" }),
-        $.OPTION3(() => $.CONSUME(Comma)),
-      ]);
+      $.OPTION(() => $.CONSUME(NamedArgument));
+      $.SUBRULE($.functionName, { LABEL: "name" });
+      $.OPTION2(() => $.CONSUME(OptionalArgument));
+      $.CONSUME(Colon);
+      $.SUBRULE2($.typeName, { LABEL: "type" });
     });
 
     $.RULE("fnStatement", () => {
@@ -283,7 +280,10 @@ class MoonBitPure extends CstParser {
       $.OPTION(() => $.SUBRULE2($.functionName));
       $.MANY(() => [
         $.CONSUME(LParen),
-        $.SUBRULE2($.argumentStatement),
+        $.MANY2(() => [
+          $.SUBRULE2($.argumentStatement),
+          $.OPTION3(() => $.CONSUME(Comma)),
+        ]),
         $.CONSUME(RParen),
         $.CONSUME(ReturnType),
         $.SUBRULE($.typeName),
@@ -502,40 +502,44 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   fnStatement(ctx: any) {
-    console.log("fnStatement", ctx);
+    // console.log("fnStatement", ctx);
     const functionName = this.visit(ctx.functionName); // Get function name
-    const args = ctx.argumentStatement?.map((argCtx: any) =>
+    const args: MoonBitArgument[] = ctx.argumentStatement?.map((argCtx: any) =>
       this.visit(argCtx)
     ); // Get arguments
+    const returnType = this.visit(ctx.typeName); // Get return type
     const block = ctx.blockStatement[0]; // Get function block
     // console.log("functionName", functionName);
     // console.log("args", args);
     // console.log("block", block);
 
     // Create a new function object
-    const fn = new MoonBitFunction(args, MoonBitType.Unit, (args: any) => {
-      // Create a new scope for the function
-      this.scopes.push({});
-      // Assign arguments to the function scope
-      args.forEach((arg: any, idx: number) => {
-        this.scopes[this.scopes.length - 1][args[idx].image] = arg;
-      });
+    const fn = new MoonBitFunction(
+      args,
+      returnType,
+      (...params: MoonBitValue[]) => {
+        // Create a new scope for the function
+        this.scopes.push({});
+        // Assign arguments to the function scope
+        params.forEach((arg: any, idx: number) => {
+          this.scopes[this.scopes.length - 1][args[idx].name] = arg;
+        });
 
-      // Execute the function block
-      const result = this.visit(block);
+        // Execute the function block
+        const result = this.visit(block);
 
-      // Remove the function scope
-      this.scopes.pop();
+        // Remove the function scope
+        this.scopes.pop();
 
-      return result;
-    });
+        return result as MoonBitValue;
+      }
+    );
 
     // Assign the function to the global scope
-    this.scopes[0][functionName] = fn;
+    return (this.scopes[0][functionName] = fn);
   }
 
   argumentStatement(ctx: any) {
-    // console.log("argumentStatement", ctx);
     const argName = this.visit(ctx.name); // Get argument name
     const argType = this.visit(ctx.type); // Get argument type
     return new MoonBitArgument(argName, argType);
@@ -590,7 +594,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
       scope[varName] instanceof MoonBitValue &&
       value instanceof MoonBitValue
     ) {
-      MoonBitType.checkWithError(value, scope[varName].type);
+      MoonBitType.checkValueTypeWithError(value, scope[varName].type);
     }
 
     scope[varName] = value; // Store variable in current scope
@@ -608,9 +612,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("value", value);
     // console.log("type", type)
     if (type !== undefined) {
-      const moonBitType = MoonBitType.match(type);
-      MoonBitType.checkWithError(value, moonBitType);
+      MoonBitType.checkValueTypeWithError(value, type);
     }
+
     // const moonBitValue = new MoonBitValue(value, moonBitType);
     Object.defineProperty(this.scopes[0], varName, {
       value: value,
@@ -863,6 +867,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   tupleExpression(ctx: any) {
+    // console.log("tupleExpression", ctx);
     return ctx.expression?.map((expr: any) => this.visit(expr));
   }
 
@@ -871,11 +876,11 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log(JSON.stringify(ctx, null, 2));
     const functionName = this.visit(ctx.functionName); // Get the function name
     const args = this.visit(ctx.tupleExpression); // Evaluate the arguments
-
+    // console.log(args);
     return this.callFunction(functionName, args);
   }
 
-  callFunction(name: string, args: any[]) {
+  callFunction(name: string, args: MoonBitValue[]) {
     // console.log("callFunction", name, args);
     // Check the function in the current scope
     let func = null;
@@ -915,7 +920,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
   typeName(ctx: any) {
     // console.log("TypeName", ctx);
-    return ctx.typeName[0].image; // Get the function name from the context
+    return MoonBitType.matchFromTypeName(ctx.typeName[0].image); // Get the function name from the context
   }
 }
 
@@ -959,7 +964,7 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    console.log("cst", cst);
+    // console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
     if (value) {
@@ -1022,9 +1027,9 @@ let strictMode = false;
 // vm.eval('let str: String = "haha"');
 // console.log(vm.eval("str")); // 返回 haha
 
-const vm = new MoonBitVM();
-vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
-// vm.eval("fn main(a: Int,b:Int)->Int { 1+1 }");
+// const vm = new MoonBitVM();
+// vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+// // vm.eval("fn main(a: Int,b:Int)->Int { 1+1 }");
 // console.log(vm.eval("add(1, 2)")); // 返回 3
 
 export { MoonBitVM, strictMode };
