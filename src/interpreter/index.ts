@@ -24,9 +24,29 @@ const Minus = createToken({
   categories: AdditionOperator,
 });
 
+const NamedArgument = createToken({
+  name: "NamedArgument",
+  pattern: /~/,
+});
+
+const OptionalArgument = createToken({
+  name: "OptionalArgument",
+  pattern: /\?/,
+});
+
+const ReturnType = createToken({
+  name: "ReturnType",
+  pattern: /->/,
+});
+
 const MultiplicationOperator = createToken({
   name: "MultiplicationOperator",
   pattern: Lexer.NA,
+});
+
+const Fn = createToken({
+  name: "Function",
+  pattern: /fn/,
 });
 
 const Multi = createToken({
@@ -187,6 +207,10 @@ const allTokens = [
   Semicolon,
   Let,
   Mut,
+  Fn,
+  NamedArgument,
+  OptionalArgument,
+  ReturnType,
   If,
   Else,
   LCurly,
@@ -242,9 +266,35 @@ class MoonBitPure extends CstParser {
       });
     });
 
+    $.RULE("argumentStatement", () => {
+      $.MANY2(() => [
+        $.OPTION(() => $.CONSUME(NamedArgument)),
+        $.SUBRULE($.functionName, { LABEL: "name" }),
+        $.OPTION2(() => $.CONSUME(OptionalArgument)),
+        $.CONSUME(Colon),
+        $.SUBRULE2($.typeName, { LABEL: "type" }),
+      ]);
+    });
+
+    $.RULE("fnStatement", () => {
+      $.CONSUME(Fn);
+
+      $.OPTION(() => $.SUBRULE2($.functionName));
+      $.MANY(() => [
+        $.CONSUME(LParen),
+        $.SUBRULE2($.argumentStatement),
+        $.CONSUME(RParen),
+        $.CONSUME(ReturnType),
+        $.SUBRULE($.typeName),
+      ]);
+
+      $.SUBRULE($.blockStatement);
+    });
+
     // 这里修改之后，expression函数中的判断也要同步修改
     $.RULE("expression", () => {
       $.OR([
+        { ALT: () => $.SUBRULE($.fnStatement) },
         { ALT: () => $.SUBRULE($.letStatement) },
         { ALT: () => $.SUBRULE($.ifStatement) },
         { ALT: () => $.SUBRULE($.assignmentStatement) },
@@ -264,10 +314,11 @@ class MoonBitPure extends CstParser {
 
     $.RULE("blockStatement", () => {
       $.CONSUME(LCurly);
-      $.MANY(() => {
-        $.SUBRULE($.expression); // Handle multiple expressions inside the block
-        $.OPTION(() => $.CONSUME(Semicolon)); // Optional semicolon
-      });
+      // $.MANY(() => {
+      //   $.SUBRULE($.expression); // Handle multiple expressions inside the block
+      //   $.OPTION(() => $.CONSUME(Semicolon)); // Optional semicolon
+      // });
+      $.SUBRULE($.row);
       $.CONSUME(RCurly);
     });
 
@@ -275,12 +326,7 @@ class MoonBitPure extends CstParser {
       $.CONSUME(Let); // 可选的 "mut" 关键字
       $.OPTION(() => $.CONSUME(Mut)); // 可选的 "mut" 关键字
       $.SUBRULE($.functionName, { LABEL: "lhs" });
-      $.OPTION2(() =>
-        $.MANY(() => [
-          $.CONSUME(Colon),
-          $.SUBRULE2($.typeName, { LABEL: "type" }),
-        ])
-      ),
+      $.OPTION2(() => $.MANY(() => [$.CONSUME(Colon), $.SUBRULE2($.typeName)])),
         $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
       $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
@@ -379,6 +425,12 @@ class MoonBitPure extends CstParser {
     // derived during the self analysis phase.
     this.performSelfAnalysis();
   }
+  fnStatement(): CstNode {
+    return notImplemented();
+  }
+  argumentStatement(): CstNode {
+    return notImplemented();
+  }
   functionName(): CstNode {
     return notImplemented();
   }
@@ -448,6 +500,46 @@ class MoonBitInterpreter extends BaseCstVisitor {
     this.validateVisitor();
   }
 
+  fnStatement(ctx: any) {
+    console.log("fnStatement", ctx);
+    const functionName = this.visit(ctx.functionName); // Get function name
+    const args = ctx.argumentStatement?.map((argCtx: any) =>
+      this.visit(argCtx)
+    ); // Get arguments
+    const block = ctx.blockStatement[0]; // Get function block
+    // console.log("functionName", functionName);
+    // console.log("args", args);
+    // console.log("block", block);
+
+    // Create a new function object
+    const fn = new MoonBitFunction(args, MoonBitType.Unit, (args: any) => {
+      // Create a new scope for the function
+      this.scopes.push({});
+      // Assign arguments to the function scope
+      args.forEach((arg: any, idx: number) => {
+        this.scopes[this.scopes.length - 1][args[idx].image] = arg;
+      });
+
+      // Execute the function block
+      const result = this.visit(block);
+
+      // Remove the function scope
+      this.scopes.pop();
+
+      return result;
+    });
+
+    // Assign the function to the global scope
+    this.scopes[0][functionName] = fn;
+  }
+
+  argumentStatement(ctx: any) {
+    // console.log("argumentStatement", ctx);
+    const argName = this.visit(ctx.name); // Get argument name
+    const argType = this.visit(ctx.type); // Get argument type
+    return new MoonBitArgument(argName, argType);
+  }
+
   ifStatement(ctx: any) {
     // console.log("ifStatement", ctx);
     const condition = this.visit(ctx.comparisonExpression); // Evaluate condition
@@ -510,7 +602,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   letStatement(ctx: any) {
     // console.log("letStatement", ctx);
     const varName = this.visit(ctx.lhs); // Get variable name
-    const type = this.visit(ctx.type); // Get variable type
+    const type = this.visit(ctx.typeName); // Get variable type
     const value = this.visit(ctx.rhs); // Evaluate expression
     // console.log("value", value);
     // console.log("type", type)
@@ -532,7 +624,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   blockStatement(ctx: any) {
     // console.log("blockStatement", ctx);
     this.scopes.push({}); // Create a new scope
-    const result = this.visit(ctx.expression[0]); // Visit all expressions in the block
+    const result = this.visit(ctx.row); // Visit all expressions in the block
     this.scopes.pop(); // Exit the scope
     return result;
   }
@@ -562,17 +654,21 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   row(ctx: any) {
     // console.log("row", ctx);
-    const length = ctx.pipelineExpression.length;
-    for (let i = 0; i < length - 1; i++) {
-      this.visit(ctx.pipelineExpression[i]);
+    if (ctx.pipelineExpression) {
+      const length = ctx.pipelineExpression.length;
+      for (let i = 0; i < length - 1; i++) {
+        this.visit(ctx.pipelineExpression[i]);
+      }
+      // console.log(length);
+      return this.visit(ctx.pipelineExpression[length - 1]);
     }
-    // console.log(length);
-    return this.visit(ctx.pipelineExpression[length - 1]);
   }
 
   expression(ctx: any) {
     // console.log("expression", ctx);
-    if (ctx.letStatement) {
+    if (ctx.fnStatement) {
+      return this.visit(ctx.fnStatement);
+    } else if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
     } else if (ctx.ifStatement) {
       return this.visit(ctx.ifStatement);
@@ -862,11 +958,15 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
+    console.log("cst", cst);
+    // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
-    if (value.toString) {
-      return value.toString();
-    } else {
-      return value;
+    if (value) {
+      if (value.toString) {
+        return value.toString();
+      } else {
+        return value;
+      }
     }
   }
 }
@@ -920,5 +1020,10 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval('let str: String = "haha"');
 // console.log(vm.eval("str")); // 返回 haha
+
+const vm = new MoonBitVM();
+vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+// vm.eval("fn main(a: Int)->Int { 1+1 }");
+console.log(vm.eval("add(1, 2)")); // 返回 3
 
 export { MoonBitVM, strictMode };

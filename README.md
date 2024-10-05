@@ -18,10 +18,10 @@ Progress:
 - [x] Basic Types
 - [x] If Statement
 - [x] Types Check
+- [ ] Functions
 - [ ] While Statement
 - [ ] For Statement
 - [ ] Match Statement
 - [ ] Match Expression
 - [ ] Enum
-- [ ] Functions
 - [ ] Struct
