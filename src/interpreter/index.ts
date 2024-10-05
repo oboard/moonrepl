@@ -48,8 +48,8 @@ const StringLiteral = createToken({
   pattern: /"(?:[^"\\]|\\.)*"/, // 允许转义字符和普通字符
 });
 
-const NumberLiteral = createToken({
-  name: "NumberLiteral",
+const IntegerLiteral = createToken({
+  name: "IntegerLiteral",
   pattern: /\d+/,
 });
 
@@ -164,6 +164,11 @@ const Equal = createToken({
   pattern: /=/,
 });
 
+const Pipeline = createToken({
+  name: "Pipeline",
+  pattern: /\|>/,
+});
+
 const LCurly = createToken({ name: "LCurly", pattern: /{/ });
 const RCurly = createToken({ name: "RCurly", pattern: /}/ });
 
@@ -182,6 +187,7 @@ const allTokens = [
   Minus,
   Multi,
   Div,
+  Pipeline,
   GreaterThanOrEqual,
   LessThanOrEqual,
   EqualEqual,
@@ -191,7 +197,7 @@ const allTokens = [
   Equal,
   LParen,
   RParen,
-  NumberLiteral,
+  IntegerLiteral,
   StringLiteral,
   ComparisonOperator,
   AdditionOperator,
@@ -212,8 +218,17 @@ class CalculatorPure extends CstParser {
 
     $.RULE("row", () => {
       $.MANY(() => {
-        $.SUBRULE($.expression);
+        $.SUBRULE($.pipelineExpression);
         $.OPTION(() => $.CONSUME(Semicolon));
+      });
+    });
+
+    $.RULE("pipelineExpression", () => {
+      $.SUBRULE($.expression, { LABEL: "lhs" });
+
+      $.MANY(() => {
+        $.CONSUME(Pipeline);
+        $.SUBRULE2($.expression, { LABEL: "rhs" });
       });
     });
 
@@ -221,9 +236,9 @@ class CalculatorPure extends CstParser {
     $.RULE("expression", () => {
       $.OR([
         { ALT: () => $.SUBRULE($.letStatement) },
-        { ALT: () => $.SUBRULE($.ifStatement) }, // Handle if statements
-        { ALT: () => $.SUBRULE($.assignmentStatement) }, // Handle assignment statements
-        { ALT: () => $.SUBRULE($.comparisonExpression) }, // Handle comparison expressions
+        { ALT: () => $.SUBRULE($.ifStatement) },
+        { ALT: () => $.SUBRULE($.assignmentStatement) },
+        { ALT: () => $.SUBRULE($.comparisonExpression) },
       ]);
     });
 
@@ -286,20 +301,21 @@ class CalculatorPure extends CstParser {
       $.OR([
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
         { ALT: () => $.CONSUME(StringLiteral) },
-        { ALT: () => $.CONSUME(NumberLiteral) },
-        { ALT: () => $.SUBRULE($.functionCall) }, // Add function calls here
-        { ALT: () => $.SUBRULE($.functionName) }, // 处理变量名
+        { ALT: () => $.CONSUME(IntegerLiteral) },
+        { ALT: () => $.SUBRULE($.functionCall) },
+        { ALT: () => $.SUBRULE($.functionName) },
       ])
     );
 
     $.RULE("functionCall", () => {
       $.SUBRULE($.functionName);
-      $.CONSUME(LParen);
-      $.MANY(() => {
-        $.SUBRULE($.expression);
-        $.OPTION(() => $.CONSUME(Comma)); // Handle multiple arguments
-      });
-      $.CONSUME(RParen);
+      $.SUBRULE($.tupleExpression);
+      // $.CONSUME(LParen);
+      // $.MANY(() => {
+      //   $.SUBRULE($.expression);
+      //   $.OPTION(() => $.CONSUME(Comma)); // Handle multiple arguments
+      // });
+      // $.CONSUME(RParen);
     });
 
     $.RULE("functionName", () => {
@@ -309,6 +325,15 @@ class CalculatorPure extends CstParser {
     $.RULE("parenthesisExpression", () => {
       $.CONSUME(LParen);
       $.SUBRULE($.expression);
+      $.CONSUME(RParen);
+    });
+
+    $.RULE("tupleExpression", () => {
+      $.CONSUME(LParen);
+      $.MANY(() => {
+        $.SUBRULE($.expression);
+        $.OPTION(() => $.CONSUME(Comma)); // Handle multiple arguments
+      });
       $.CONSUME(RParen);
     });
 
@@ -337,7 +362,13 @@ class CalculatorPure extends CstParser {
   functionName(): CstNode {
     throw new Error("Method not implemented.");
   }
+  tupleExpression(): CstNode {
+    throw new Error("Method not implemented.");
+  }
   functionCall(): CstNode {
+    throw new Error("Method not implemented.");
+  }
+  pipelineExpression(): CstNode {
     throw new Error("Method not implemented.");
   }
   blockStatement(): CstNode {
@@ -383,7 +414,7 @@ const parser = new CalculatorPure();
 const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 
 class CalculatorInterpreter extends BaseCstVisitor {
-  scopes: Record<string, any>[] = [{}]; // Initialize with a global scope
+  scopes: Record<string, MoonBitValue>[] = [{}]; // Initialize with a global scope
 
   constructor() {
     super();
@@ -405,7 +436,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
       if (ctx.elseifStatement) {
         for (let i = 0; i < ctx.elseifStatement.length; i++) {
           const elseIfCtx = ctx.elseifStatement[i].children;
-          console.log("elseIfCtx", elseIfCtx);
+          // console.log("elseIfCtx", elseIfCtx);
           const elseIfCondition = this.visit(elseIfCtx.comparisonExpression[0]); // Evaluate else if condition
           if (elseIfCondition) {
             // If else if condition is true, evaluate the 'else if' block
@@ -489,16 +520,17 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 
   row(ctx: any) {
-    console.log("row", ctx);
-    const length = ctx.expression.length;
+    // console.log("row", ctx);
+    const length = ctx.pipelineExpression.length;
     for (let i = 0; i < length - 1; i++) {
-      this.visit(ctx.expression[i]);
+      this.visit(ctx.pipelineExpression[i]);
     }
-    console.log(length);
-    return this.visit(ctx.expression[length - 1]);
+    // console.log(length);
+    return this.visit(ctx.pipelineExpression[length - 1]);
   }
 
   expression(ctx: any) {
+    // console.log("expression", ctx);
     if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
     } else if (ctx.ifStatement) {
@@ -600,7 +632,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
       // to passing the array's first element
       return this.visit(ctx.parenthesisExpression);
     } else if (ctx.StringLiteral) {
-      console.log(ctx.StringLiteral[0].image);
+      // console.log(ctx.StringLiteral[0].image);
       // 获取字符串值，去掉引号
       let strValue: string = ctx.StringLiteral[0].image.slice(1, -1);
 
@@ -622,21 +654,52 @@ class CalculatorInterpreter extends BaseCstVisitor {
       };
 
       strValue = strValue.replace(templateRegex, (_match, expression) => {
-        console.log("expression", expression);
+        // console.log("expression", expression);
         const result = parse(expression);
         return String(result);
       });
 
-      return strValue;
-    } else if (ctx.NumberLiteral) {
+      return new MoonBitValue(MoonBitType.String, strValue);
+    } else if (ctx.IntegerLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
-      return parseInt(ctx.NumberLiteral[0].image, 10);
+      return new MoonBitValue(
+        MoonBitType.Int,
+        parseInt(ctx.IntegerLiteral[0].image, 10)
+      );
     } else if (ctx.functionCall) {
       // If a key exists on the ctx, at least one element is guaranteed
       return this.visit(ctx.functionCall);
     } else {
       console.log(ctx);
     }
+  }
+
+  pipelineExpression(ctx: any) {
+    // console.log("pipelineExpression", JSON.stringify(ctx, null, 2));
+    let result = this.visit(ctx.lhs); // Visit the first expression
+
+    if (ctx.rhs) {
+      for (let i = 0; i < ctx.rhs.length; i++) {
+        const func = this.visit(ctx.rhs[i]);
+        // console.log(
+        //   "func",
+        //   func.value({
+        //     type: "Int",
+        //     value: 20,
+        //   })
+        // );
+        // console.log(result)
+
+        if (func.type === MoonBitType.Function) {
+          // this.callFunction(func, result);
+
+          result = func.value(result); // Call the function with the result
+        } else {
+          throw new Error(`Function ${func} is not defined.`);
+        }
+      }
+    }
+    return result;
   }
 
   parenthesisExpression(ctx: any) {
@@ -655,38 +718,125 @@ class CalculatorInterpreter extends BaseCstVisitor {
     this.scopes.shift(); // Remove the current scope
   }
 
+  tupleExpression(ctx: any) {
+    return ctx.expression?.map((expr: any) => this.visit(expr));
+  }
+
   // Visit a function call
   functionCall(ctx: any) {
     // console.log(JSON.stringify(ctx, null, 2));
-    const functionName = ctx.functionName[0].children.functionName[0].image; // Get the function name
-    const args = ctx.expression.map((arg: any) => this.visit(arg)); // Evaluate the arguments
+    const functionName = this.visit(ctx.functionName); // Get the function name
+    const args = this.visit(ctx.tupleExpression); // Evaluate the arguments
 
+    return this.callFunction(functionName, args);
+  }
+
+  callFunction(name: string, args: any[]) {
+    // console.log("callFunction", name, args);
     // Check the function in the current scope
     let func = null;
     for (const scope of this.scopes) {
-      if (functionName in scope) {
-        func = scope[functionName];
+      if (name in scope) {
+        func = scope[name];
         break;
       }
     }
-
-    if (typeof func === "function") {
-      return func(...args); // Call the function with evaluated arguments
+    // console.log("func", func instanceof MoonBitFunction);
+    if (func instanceof MoonBitFunction) {
+      if (args === undefined) {
+        return func;
+      }
+      // 检查类型
+      func.args.forEach((arg: any, idx: number) => {
+        if (arg.type !== args[idx].type) {
+          throw new Error(`Argument ${idx} is not ${arg.type}`);
+        }
+      });
+      return func.value(...args); // Call the function with evaluated arguments
     } else {
-      throw new Error(`Function ${functionName} is not defined.`);
+      throw new Error(`Function ${name} is not defined.`);
     }
   }
 
   // Example of adding a new function
 
   // Add a function to the current scope
-  addFunction(name: string, func: (...args: any[]) => any) {
+  addFunction(name: string, func: MoonBitFunction) {
     this.scopes[0][name] = func; // Add to the global scope (first scope)
   }
   // Define the functionName method
   functionName(ctx: any) {
-    // console.log(ctx);
-    return ctx[0].image; // Get the function name from the context
+    // console.log("functionName", ctx);
+    return ctx.functionName[0].image; // Get the function name from the context
+  }
+}
+
+// enum MoonBitType {
+//   Unit = "Unit",
+//   Int = "Int",
+//   Double = "Double",
+//   String = "String",
+//   Bool = "Bool",
+//   Char = "Char",
+//   Function = "Function",
+// }
+
+class MoonBitType {
+  name: string = "Unit";
+
+  static Unit = new MoonBitType("Unit");
+  static Int = new MoonBitType("Int");
+  static Double = new MoonBitType("Double");
+  static String = new MoonBitType("String");
+  static Bool = new MoonBitType("Bool");
+  static Char = new MoonBitType("Char");
+  static Function = new MoonBitType("Function");
+
+  constructor(name: string) {
+    this.name = name;
+  }
+}
+
+class MoonBitValue {
+  type: MoonBitType;
+  value: any;
+
+  static Unit = new MoonBitValue(MoonBitType.Unit, undefined);
+
+  constructor(type: MoonBitType, value: any) {
+    this.type = type;
+    this.value = value;
+  }
+
+  toString() {
+    return this.value;
+  }
+}
+
+class MoonBitArgument {
+  name: string = "";
+  type: MoonBitType = MoonBitType.String;
+
+  constructor(name: string, type: MoonBitType) {
+    this.name = name;
+    this.type = type;
+  }
+}
+
+class MoonBitFunction extends MoonBitValue {
+  type: MoonBitType = MoonBitType.Function;
+  args: MoonBitArgument[] = [];
+  returnType: MoonBitType = MoonBitType.Unit;
+  // value: (...args: MoonBitValue[]) => MoonBitValue = () => {};
+
+  constructor(
+    args: MoonBitArgument[],
+    returnType: MoonBitType,
+    value: (...args: MoonBitValue[]) => MoonBitValue
+  ) {
+    super(MoonBitType.Function, value);
+    this.args = args;
+    this.returnType = returnType;
   }
 }
 
@@ -696,11 +846,33 @@ class MoonBitVM {
   constructor() {
     this.interpreter = new CalculatorInterpreter();
 
-    // 定义一些示例函数，例如 println
-    this.interpreter.addFunction("println", (...args: any[]) => {
-      console.log(...args);
-      return args[0];
-    });
+    this.interpreter.addFunction(
+      "println",
+      new MoonBitFunction(
+        [
+          {
+            type: MoonBitType.String,
+            name: "arg",
+          },
+        ],
+        MoonBitType.Unit,
+        (arg: MoonBitValue) => {
+          console.log(arg.toString());
+          return MoonBitValue.Unit;
+        }
+      )
+    );
+
+    this.interpreter.addFunction(
+      "double",
+      new MoonBitFunction(
+        [new MoonBitArgument("arg", MoonBitType.Int)],
+        MoonBitType.Double,
+        (arg: MoonBitValue) => {
+          return new MoonBitValue(MoonBitType.Double, arg.value * 2);
+        }
+      )
+    );
   }
 
   // Evaluate an expression in the current scope
@@ -708,7 +880,12 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    return this.interpreter.visit(cst);
+    const value = this.interpreter.visit(cst);
+    if (value.toString) {
+      return value.toString();
+    } else {
+      return value;
+    }
   }
 }
 
@@ -753,5 +930,9 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // console.log(vm.eval('"haha"')); // 输出 haha
 // console.log(vm.eval('"ha\\{1+1}ha"')); // 输出 ha2ha
+
+const vm = new MoonBitVM();
+console.log(vm.eval('"haha" |> println')); // 输出 haha
+console.log(vm.eval("1 |> double()")); // 输出 2
 
 export { MoonBitVM, strictMode };

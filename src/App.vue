@@ -65,6 +65,26 @@ onMounted(() => {
         // 输出彩色字符
         term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`);
 
+        term.registerLinkProvider({
+            provideLinks(bufferLineNumber, callback) {
+                switch (bufferLineNumber) {
+                    case 0:
+                        callback([
+                            {
+                                text: 'oboard',
+                                range: { start: { x: 28, y: 2 }, end: { x: 34, y: 2 } },
+                                activate() {
+                                    window.open('https://github.com/oboard', '_blank');
+                                }
+                            },
+                        ]);
+                        return;
+                }
+                callback(undefined);
+            }
+        });
+
+
         const writePrompt = () => {
             term.write(`${GREEN}❯ ${RESET}`); // 显示提示符
         };
@@ -124,7 +144,7 @@ onMounted(() => {
                     writePrompt(); // 重新显示提示符
                     break;
                 case '\x7f': // 退格键
-                    if (cursorPosition > 0) {
+                    if (cursorPosition > 0 && inputBuffer.length > 0) {
                         inputBuffer =
                             inputBuffer.slice(0, cursorPosition - 1) + inputBuffer.slice(cursorPosition);
                         cursorPosition--; // 光标向左移动一位
