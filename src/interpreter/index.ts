@@ -5,6 +5,9 @@ import {
   tokenMatcher,
   CstNode,
 } from "chevrotain";
+import { MoonBitType } from "./types";
+import { MoonBitValue } from "./value";
+import { MoonBitArgument, MoonBitFunction } from "./function";
 
 // actual Tokens that can appear in the text
 const AdditionOperator = createToken({
@@ -38,6 +41,8 @@ const Div = createToken({
   pattern: /\//,
   categories: MultiplicationOperator,
 });
+
+const Colon = createToken({ name: "Colon", pattern: /:/ });
 
 const LParen = createToken({ name: "LParen", pattern: /\(/ });
 const RParen = createToken({ name: "RParen", pattern: /\)/ });
@@ -188,6 +193,7 @@ const allTokens = [
   Multi,
   Div,
   Pipeline,
+  Colon,
   GreaterThanOrEqual,
   LessThanOrEqual,
   EqualEqual,
@@ -210,7 +216,7 @@ const CalculatorLexer = new Lexer(allTokens);
 // ----------------- parser -----------------
 // Note that this is a Pure grammar, it only describes the grammar
 // Not any actions (semantics) to perform during parsing.
-class CalculatorPure extends CstParser {
+class MoonBitPure extends CstParser {
   constructor() {
     super(allTokens);
 
@@ -265,7 +271,13 @@ class CalculatorPure extends CstParser {
       $.CONSUME(Let); // 可选的 "mut" 关键字
       $.OPTION(() => $.CONSUME(Mut)); // 可选的 "mut" 关键字
       $.SUBRULE($.functionName, { LABEL: "lhs" });
-      $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
+      $.OPTION2(() =>
+        $.MANY(() => [
+          $.CONSUME(Colon),
+          $.SUBRULE2($.functionName, { LABEL: "type" }),
+        ])
+      ),
+        $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
       $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
 
@@ -408,12 +420,12 @@ class CalculatorPure extends CstParser {
 
 // wrapping it all together
 // reuse the same parser instance.
-const parser = new CalculatorPure();
+const parser = new MoonBitPure();
 
 // ----------------- Interpreter -----------------
 const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 
-class CalculatorInterpreter extends BaseCstVisitor {
+class MoonBitInterpreter extends BaseCstVisitor {
   scopes: Record<string, MoonBitValue>[] = [{}]; // Initialize with a global scope
 
   constructor() {
@@ -777,100 +789,11 @@ class CalculatorInterpreter extends BaseCstVisitor {
   }
 }
 
-// enum MoonBitType {
-//   Unit = "Unit",
-//   Int = "Int",
-//   Double = "Double",
-//   String = "String",
-//   Bool = "Bool",
-//   Char = "Char",
-//   Function = "Function",
-// }
-
-class MoonBitType {
-  name: string = "Unit";
-
-  static Unit = new MoonBitType("Unit");
-  static Int = new MoonBitType("Int");
-  static Double = new MoonBitType("Double");
-  static String = new MoonBitType("String");
-  static Bool = new MoonBitType("Bool");
-  static Char = new MoonBitType("Char");
-  static Function = new MoonBitType("Function");
-
-  constructor(name: string) {
-    this.name = name;
-  }
-}
-
-class MoonBitValue {
-  type: MoonBitType;
-  value: any;
-
-  static Unit = new MoonBitValue(undefined, MoonBitType.Unit);
-
-  constructor(value: any, type?: MoonBitType) {
-    if (type === undefined) {
-      this.type = this.getType(value);
-    } else {
-      this.type = type;
-    }
-    this.value = value;
-  }
-
-  getType(value: any) {
-    if (value === undefined) {
-      return MoonBitType.Unit;
-    } else if (typeof value === "number") {
-      return MoonBitType.Int;
-    } else if (typeof value === "string") {
-      return MoonBitType.String;
-    } else if (typeof value === "boolean") {
-      return MoonBitType.Bool;
-    } else if (typeof value === "function") {
-      return MoonBitType.Function;
-    } else {
-      throw new Error(`Unknown type: ${typeof value}`);
-    }
-  }
-
-  toString() {
-    return this.value;
-  }
-}
-
-class MoonBitArgument {
-  name: string = "";
-  type: MoonBitType = MoonBitType.String;
-
-  constructor(name: string, type: MoonBitType) {
-    this.name = name;
-    this.type = type;
-  }
-}
-
-class MoonBitFunction extends MoonBitValue {
-  type: MoonBitType = MoonBitType.Function;
-  args: MoonBitArgument[] = [];
-  returnType: MoonBitType = MoonBitType.Unit;
-  // value: (...args: MoonBitValue[]) => MoonBitValue = () => {};
-
-  constructor(
-    args: MoonBitArgument[],
-    returnType: MoonBitType,
-    value: (...args: MoonBitValue[]) => MoonBitValue
-  ) {
-    super(value, MoonBitType.Function);
-    this.args = args;
-    this.returnType = returnType;
-  }
-}
-
 class MoonBitVM {
-  private interpreter: CalculatorInterpreter;
+  private interpreter: MoonBitInterpreter;
 
   constructor() {
-    this.interpreter = new CalculatorInterpreter();
+    this.interpreter = new MoonBitInterpreter();
 
     this.interpreter.addFunction(
       "println",
@@ -883,7 +806,7 @@ class MoonBitVM {
         ],
         MoonBitType.Unit,
         (arg: MoonBitValue) => {
-          // console.log(arg.toString());
+          console.log(arg.toString());
           return MoonBitValue.Unit;
         }
       )
