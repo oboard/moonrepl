@@ -1044,8 +1044,8 @@ let strictMode = false;
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
 // console.log(vm.eval("add(1, 2)")); // 返回 3
 
-const vm = new MoonBitVM();
-vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
-console.log(vm.eval("1 |> add(2,2)")); // 返回 3
+// const vm = new MoonBitVM();
+// vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+// console.log(vm.eval("1 |> add(2)")); // 返回 3
 
 export { MoonBitVM, strictMode };
