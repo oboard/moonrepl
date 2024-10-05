@@ -271,7 +271,7 @@ class MoonBitPure extends CstParser {
       $.SUBRULE($.functionName, { LABEL: "name" });
       $.OPTION2(() => $.CONSUME(OptionalArgument));
       $.CONSUME(Colon);
-      $.SUBRULE2($.typeName, { LABEL: "type" });
+      $.SUBRULE2($.typeStatement, { LABEL: "type" });
     });
 
     $.RULE("fnStatement", () => {
@@ -286,7 +286,7 @@ class MoonBitPure extends CstParser {
         ]),
         $.CONSUME(RParen),
         $.CONSUME(ReturnType),
-        $.SUBRULE($.typeName),
+        $.SUBRULE($.typeStatement),
       ]);
 
       $.SUBRULE($.blockStatement);
@@ -327,7 +327,7 @@ class MoonBitPure extends CstParser {
       $.CONSUME(Let); // 可选的 "mut" 关键字
       $.OPTION(() => $.CONSUME(Mut)); // 可选的 "mut" 关键字
       $.SUBRULE($.functionName, { LABEL: "lhs" });
-      $.OPTION2(() => $.MANY(() => [$.CONSUME(Colon), $.SUBRULE2($.typeName)])),
+      $.OPTION2(() => $.MANY(() => [$.CONSUME(Colon), $.SUBRULE2($.typeStatement)])),
         $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
       $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
@@ -385,8 +385,8 @@ class MoonBitPure extends CstParser {
       $.CONSUME(FunctionName, { LABEL: "functionName" });
     });
 
-    $.RULE("typeName", () => {
-      $.CONSUME(TypeName, { LABEL: "typeName" });
+    $.RULE("typeStatement", () => {
+      $.CONSUME(TypeName, { LABEL: "typeStatement" });
     });
 
     $.RULE("parenthesisExpression", () => {
@@ -435,7 +435,7 @@ class MoonBitPure extends CstParser {
   functionName(): CstNode {
     return notImplemented();
   }
-  typeName(): CstNode {
+  typeStatement(): CstNode {
     return notImplemented();
   }
   tupleExpression(): CstNode {
@@ -507,7 +507,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const args: MoonBitArgument[] = ctx.argumentStatement?.map((argCtx: any) =>
       this.visit(argCtx)
     ); // Get arguments
-    const returnType = this.visit(ctx.typeName); // Get return type
+    const returnType = this.visit(ctx.typeStatement); // Get return type
     const block = ctx.blockStatement[0]; // Get function block
     // console.log("functionName", functionName);
     // console.log("args", args);
@@ -607,7 +607,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   letStatement(ctx: any) {
     // console.log("letStatement", ctx);
     const varName = this.visit(ctx.lhs); // Get variable name
-    const type = this.visit(ctx.typeName); // Get variable type
+    const type = this.visit(ctx.typeStatement); // Get variable type
     const value = this.visit(ctx.rhs); // Evaluate expression
     // console.log("value", value);
     // console.log("type", type)
@@ -907,7 +907,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
         );
         // throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
       } else if (args.length > func.args.length) {
-        throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
+        throw new Error(
+          `Expected ${func.args.length} arguments, got ${args.length}`
+        );
       }
       func.args.forEach((arg: any, idx: number) => {
         if (arg.type !== args[idx].type) {
@@ -931,9 +933,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("functionName", ctx);
     return ctx.functionName[0].image; // Get the function name from the context
   }
-  typeName(ctx: any) {
+  typeStatement(ctx: any) {
     // console.log("TypeName", ctx);
-    return MoonBitType.matchFromTypeName(ctx.typeName[0].image); // Get the function name from the context
+    return MoonBitType.matchFromTypeName(ctx.typeStatement[0].image); // Get the function name from the context
   }
 }
 
@@ -955,21 +957,21 @@ class MoonBitVM {
         MoonBitType.Unit,
         (arg: MoonBitValue) => {
           console.log(arg.toString());
-          return MoonBitValue.Unit;
+          return new MoonBitValue(arg.toString(), MoonBitType.Unit);
         }
       )
     );
 
-    this.interpreter.addFunction(
-      "double",
-      new MoonBitFunction(
-        [new MoonBitArgument("arg", MoonBitType.Int)],
-        MoonBitType.Double,
-        (arg: MoonBitValue) => {
-          return new MoonBitValue(arg.value * 2, MoonBitType.Double);
-        }
-      )
-    );
+    // this.interpreter.addFunction(
+    //   "double",
+    //   new MoonBitFunction(
+    //     [new MoonBitArgument("arg", MoonBitType.Int)],
+    //     MoonBitType.Double,
+    //     (arg: MoonBitValue) => {
+    //       return new MoonBitValue(arg.value * 2, MoonBitType.Double);
+    //     }
+    //   )
+    // );
   }
 
   // Evaluate an expression in the current scope
@@ -1047,5 +1049,9 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
 // console.log(vm.eval("1 |> add(2)")); // 返回 3
+
+// const vm = new MoonBitVM();
+// vm.eval("fn echo(str: String) -> Unit { println(str) }");
+// vm.eval("echo(\"hello\")"); // 输出 hello
 
 export { MoonBitVM, strictMode };

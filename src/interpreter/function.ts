@@ -17,9 +17,9 @@ class MoonBitFunction extends MoonBitValue {
   }
 
   toString() {
-    return `[(${this.args.map((arg) => arg.type.name).join(",")}) -> ${
+    return `(${this.args.map((arg) => arg.type.name).join(",")}) -> ${
       this.returnType.name
-    }]`;
+    }`;
   }
 }
 

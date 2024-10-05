@@ -42,8 +42,6 @@ class MoonBitType {
         return MoonBitType.Bool;
       case "Char":
         return MoonBitType.Char;
-      case "Function":
-        return MoonBitType.Function;
       default:
         throw new Error(`Unknown type: ${strType}`);
     }
