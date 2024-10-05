@@ -15,8 +15,9 @@ Progress:
 - [x] Let Mut Statement
 - [x] Strict Mode
 - [x] Template String
-- [ ] Types
+- [x] Basic Types
 - [x] If Statement
+- [x] Types Check
 - [ ] While Statement
 - [ ] For Statement
 - [ ] Match Statement

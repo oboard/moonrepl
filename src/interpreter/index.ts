@@ -917,8 +917,8 @@ let strictMode = false;
 // console.log(vm.eval('"haha" |> println')); // 输出 haha 返回 undefined
 // console.log(vm.eval("1 |> double()")); // 返回 2
 
-const vm = new MoonBitVM();
-vm.eval('let str: String = "haha"');
-console.log(vm.eval("str")); // 返回 haha
+// const vm = new MoonBitVM();
+// vm.eval('let str: String = "haha"');
+// console.log(vm.eval("str")); // 返回 haha
 
 export { MoonBitVM, strictMode };
