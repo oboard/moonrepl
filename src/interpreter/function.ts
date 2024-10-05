@@ -1,7 +1,6 @@
-import { MoonBitType, MoonBitValue } from "./types";
+import { MoonBitFunctionType, MoonBitType, MoonBitValue } from "./types";
 
 class MoonBitFunction extends MoonBitValue {
-  type: MoonBitType = MoonBitType.Function;
   args: MoonBitArgument[] = [];
   returnType: MoonBitType = MoonBitType.Unit;
   // value: (...args: MoonBitValue[]) => MoonBitValue = () => {};
@@ -11,15 +10,14 @@ class MoonBitFunction extends MoonBitValue {
     returnType: MoonBitType,
     value: (...args: MoonBitValue[]) => MoonBitValue
   ) {
-    super(value, MoonBitType.Function);
+    const argsType = args.map((arg) => arg.type);
+    super(value, new MoonBitFunctionType(argsType, returnType));
     this.args = args;
     this.returnType = returnType;
   }
 
   toString() {
-    return `(${this.args.map((arg) => arg.type.name).join(",")}) -> ${
-      this.returnType.name
-    }`;
+    return `[${this.type.toString()}]`;
   }
 }
 

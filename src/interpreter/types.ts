@@ -49,9 +49,7 @@ class MoonBitType {
 
   static checkValueTypeWithError(value: any, type: MoonBitType) {
     if (value instanceof MoonBitValue && type !== value.type) {
-      throw new Error(
-        `Type mismatch: expected ${type}, got ${value.type}`
-      );
+      throw new Error(`Type mismatch: expected ${type}, got ${value.type}`);
     }
   }
   static check(value: any, type: MoonBitType) {
@@ -64,6 +62,23 @@ class MoonBitType {
 
   toString() {
     return `[${this.name}]`;
+  }
+}
+
+class MoonBitFunctionType extends MoonBitType {
+  args: MoonBitType[];
+  returnType: MoonBitType;
+
+  constructor(args: MoonBitType[], returnType: MoonBitType) {
+    super("Function");
+    this.args = args;
+    this.returnType = returnType;
+  }
+
+  toString(): string {
+    return `(${this.args
+      .map((arg) => arg.toString())
+      .join(",")}) -> ${this.returnType.toString()}`;
   }
 }
 
@@ -87,4 +102,4 @@ class MoonBitValue {
   }
 }
 
-export { MoonBitType, MoonBitValue };
+export { MoonBitType, MoonBitFunctionType, MoonBitValue };
