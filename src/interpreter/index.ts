@@ -372,50 +372,53 @@ class MoonBitPure extends CstParser {
     this.performSelfAnalysis();
   }
   functionName(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   tupleExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   functionCall(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   pipelineExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   blockStatement(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   additionExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   multiplicationExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   comparisonExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   atomicExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   parenthesisExpression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   row(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   expression(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   ifStatement(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   letStatement(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
   assignmentStatement(): CstNode {
-    throw new Error("Method not implemented.");
+    return notImplemented();
   }
+}
+function notImplemented(): never {
+  throw new Error("Method not implemented.");
 }
 
 // wrapping it all together
