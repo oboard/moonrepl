@@ -16,9 +16,10 @@ Progress:
 - [x] Strict Mode
 - [x] Template String
 - [x] Basic Types
+- [x] Function Types
 - [x] If Statement
 - [x] Types Check
-- [ ] Functions
+- [x] Functions
 - [ ] While Statement
 - [ ] For Statement
 - [ ] Match Statement
