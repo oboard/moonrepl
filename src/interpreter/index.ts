@@ -579,19 +579,25 @@ class CalculatorInterpreter extends BaseCstVisitor {
           let rhsValue = this.visit(rhsOperand);
           let operator = ctx.ComparisonOperator[idx];
 
+          let lhsValue = result.value;
+
           if (tokenMatcher(operator, GreaterThan)) {
-            result = result > rhsValue;
+            result = lhsValue > rhsValue;
           } else if (tokenMatcher(operator, LessThan)) {
-            result = result < rhsValue;
+            result = lhsValue < rhsValue;
           } else if (tokenMatcher(operator, EqualEqual)) {
-            result = result === rhsValue;
+            result = lhsValue === rhsValue;
           } else if (tokenMatcher(operator, NotEqual)) {
-            result = result !== rhsValue;
+            result = lhsValue !== rhsValue;
           } else if (tokenMatcher(operator, GreaterThanOrEqual)) {
-            result = result >= rhsValue;
+            result = lhsValue >= rhsValue;
           } else if (tokenMatcher(operator, LessThanOrEqual)) {
-            result = result <= rhsValue;
+            result = lhsValue <= rhsValue;
+          } else {
+            return result;
           }
+
+          result = new MoonBitValue(result, MoonBitType.Bool);
         }
       );
     }
@@ -659,12 +665,12 @@ class CalculatorInterpreter extends BaseCstVisitor {
         return String(result);
       });
 
-      return new MoonBitValue(MoonBitType.String, strValue);
+      return new MoonBitValue(strValue, MoonBitType.String);
     } else if (ctx.IntegerLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return new MoonBitValue(
-        MoonBitType.Int,
-        parseInt(ctx.IntegerLiteral[0].image, 10)
+        parseInt(ctx.IntegerLiteral[0].image, 10),
+        MoonBitType.Int
       );
     } else if (ctx.functionCall) {
       // If a key exists on the ctx, at least one element is guaranteed
@@ -692,7 +698,7 @@ class CalculatorInterpreter extends BaseCstVisitor {
 
         if (func.type === MoonBitType.Function) {
           // this.callFunction(func, result);
-
+          // console.log("func", func);
           result = func.value(result); // Call the function with the result
         } else {
           throw new Error(`Function ${func} is not defined.`);
@@ -801,11 +807,31 @@ class MoonBitValue {
   type: MoonBitType;
   value: any;
 
-  static Unit = new MoonBitValue(MoonBitType.Unit, undefined);
+  static Unit = new MoonBitValue(undefined, MoonBitType.Unit);
 
-  constructor(type: MoonBitType, value: any) {
-    this.type = type;
+  constructor(value: any, type?: MoonBitType) {
+    if (type === undefined) {
+      this.type = this.getType(value);
+    } else {
+      this.type = type;
+    }
     this.value = value;
+  }
+
+  getType(value: any) {
+    if (value === undefined) {
+      return MoonBitType.Unit;
+    } else if (typeof value === "number") {
+      return MoonBitType.Int;
+    } else if (typeof value === "string") {
+      return MoonBitType.String;
+    } else if (typeof value === "boolean") {
+      return MoonBitType.Bool;
+    } else if (typeof value === "function") {
+      return MoonBitType.Function;
+    } else {
+      throw new Error(`Unknown type: ${typeof value}`);
+    }
   }
 
   toString() {
@@ -834,7 +860,7 @@ class MoonBitFunction extends MoonBitValue {
     returnType: MoonBitType,
     value: (...args: MoonBitValue[]) => MoonBitValue
   ) {
-    super(MoonBitType.Function, value);
+    super(value, MoonBitType.Function);
     this.args = args;
     this.returnType = returnType;
   }
@@ -857,7 +883,7 @@ class MoonBitVM {
         ],
         MoonBitType.Unit,
         (arg: MoonBitValue) => {
-          console.log(arg.toString());
+          // console.log(arg.toString());
           return MoonBitValue.Unit;
         }
       )
@@ -869,7 +895,7 @@ class MoonBitVM {
         [new MoonBitArgument("arg", MoonBitType.Int)],
         MoonBitType.Double,
         (arg: MoonBitValue) => {
-          return new MoonBitValue(MoonBitType.Double, arg.value * 2);
+          return new MoonBitValue(arg.value * 2, MoonBitType.Double);
         }
       )
     );
@@ -932,7 +958,7 @@ let strictMode = false;
 // console.log(vm.eval('"ha\\{1+1}ha"')); // 输出 ha2ha
 
 const vm = new MoonBitVM();
-console.log(vm.eval('"haha" |> println')); // 输出 haha
-console.log(vm.eval("1 |> double()")); // 输出 2
+console.log(vm.eval('"haha" |> println')); // 输出 haha 返回 undefined
+console.log(vm.eval("1 |> double()")); // 返回 2
 
 export { MoonBitVM, strictMode };
