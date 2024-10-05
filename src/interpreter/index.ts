@@ -267,12 +267,13 @@ class MoonBitPure extends CstParser {
     });
 
     $.RULE("argumentStatement", () => {
-      $.MANY2(() => [
+      $.MANY(() => [
         $.OPTION(() => $.CONSUME(NamedArgument)),
         $.SUBRULE($.functionName, { LABEL: "name" }),
         $.OPTION2(() => $.CONSUME(OptionalArgument)),
         $.CONSUME(Colon),
         $.SUBRULE2($.typeName, { LABEL: "type" }),
+        $.OPTION3(() => $.CONSUME(Comma)),
       ]);
     });
 
@@ -1023,7 +1024,7 @@ let strictMode = false;
 
 const vm = new MoonBitVM();
 vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
-// vm.eval("fn main(a: Int)->Int { 1+1 }");
-console.log(vm.eval("add(1, 2)")); // 返回 3
+// vm.eval("fn main(a: Int,b:Int)->Int { 1+1 }");
+// console.log(vm.eval("add(1, 2)")); // 返回 3
 
 export { MoonBitVM, strictMode };
