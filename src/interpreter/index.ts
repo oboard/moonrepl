@@ -5,8 +5,7 @@ import {
   tokenMatcher,
   CstNode,
 } from "chevrotain";
-import { MoonBitType } from "./types";
-import { MoonBitValue } from "./value";
+import { MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
 
 // actual Tokens that can appear in the text
@@ -67,6 +66,10 @@ const IntegerLiteral = createToken({
 //   name: "DoubleQuote",
 //   pattern: /"/,
 // });
+const TypeName = createToken({
+  name: "TypeName",
+  pattern: /[A-Z][a-zA-Z0-9_]*/,
+});
 
 const FunctionName = createToken({
   name: "FunctionName",
@@ -209,6 +212,7 @@ const allTokens = [
   AdditionOperator,
   MultiplicationOperator,
   FunctionName,
+  TypeName,
   Comma,
 ];
 const CalculatorLexer = new Lexer(allTokens);
@@ -274,7 +278,7 @@ class MoonBitPure extends CstParser {
       $.OPTION2(() =>
         $.MANY(() => [
           $.CONSUME(Colon),
-          $.SUBRULE2($.functionName, { LABEL: "type" }),
+          $.SUBRULE2($.typeName, { LABEL: "type" }),
         ])
       ),
         $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
@@ -334,6 +338,10 @@ class MoonBitPure extends CstParser {
       $.CONSUME(FunctionName, { LABEL: "functionName" });
     });
 
+    $.RULE("typeName", () => {
+      $.CONSUME(TypeName, { LABEL: "typeName" });
+    });
+
     $.RULE("parenthesisExpression", () => {
       $.CONSUME(LParen);
       $.SUBRULE($.expression);
@@ -372,6 +380,9 @@ class MoonBitPure extends CstParser {
     this.performSelfAnalysis();
   }
   functionName(): CstNode {
+    return notImplemented();
+  }
+  typeName(): CstNode {
     return notImplemented();
   }
   tupleExpression(): CstNode {
@@ -473,7 +484,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   assignmentStatement(ctx: any) {
     // console.log("assignmentStatement", ctx);
-    const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
+    const varName = this.visit(ctx.lhs); // Get variable name
     const value = this.visit(ctx.rhs); // Evaluate expression
     const scope = this.getVariableScope(varName) ?? this.scopes[0]; // Get the variable scope
 
@@ -481,6 +492,14 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (Object.getOwnPropertyDescriptor(scope, varName)?.writable === false) {
       throw new Error(`Variable ${varName} is not mutable.`);
     }
+
+    if (
+      scope[varName] instanceof MoonBitValue &&
+      value instanceof MoonBitValue
+    ) {
+      MoonBitType.checkWithError(value, scope[varName].type);
+    }
+
     scope[varName] = value; // Store variable in current scope
 
     return value;
@@ -490,12 +509,18 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   letStatement(ctx: any) {
     // console.log("letStatement", ctx);
-    const varName = ctx.lhs[0].children.functionName[0].image; // Get variable name
+    const varName = this.visit(ctx.lhs); // Get variable name
+    const type = this.visit(ctx.type); // Get variable type
     const value = this.visit(ctx.rhs); // Evaluate expression
     // console.log("value", value);
-
+    // console.log("type", type)
+    if (type !== undefined) {
+      const moonBitType = MoonBitType.match(type);
+      MoonBitType.checkWithError(value, moonBitType);
+    }
+    // const moonBitValue = new MoonBitValue(value, moonBitType);
     Object.defineProperty(this.scopes[0], varName, {
-      value,
+      value: value,
       writable: ctx.Mut !== undefined,
       enumerable: true,
       configurable: true,
@@ -517,6 +542,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("getVariable", name, this.scopes);
     for (let i = this.scopes.length - 1; i >= 0; i--) {
       if (this.scopes[i][name] !== undefined) {
+        // console.log("getVariable", name, this.scopes[i][name]);
         return this.scopes[i][name];
       }
     }
@@ -646,7 +672,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   atomicExpression(ctx: any) {
     if (ctx.functionName) {
-      const varName = ctx.functionName[0].children.functionName[0].image; // Get the variable name
+      const varName = this.visit(ctx.functionName); // Get the variable name
       return this.getVariable(varName);
     } else if (ctx.parenthesisExpression) {
       // passing an array to "this.visit" is equivalent
@@ -790,6 +816,10 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("functionName", ctx);
     return ctx.functionName[0].image; // Get the function name from the context
   }
+  typeName(ctx: any) {
+    // console.log("TypeName", ctx);
+    return ctx.typeName[0].image; // Get the function name from the context
+  }
 }
 
 class MoonBitVM {
@@ -883,8 +913,12 @@ let strictMode = false;
 // console.log(vm.eval('"haha"')); // 输出 haha
 // console.log(vm.eval('"ha\\{1+1}ha"')); // 输出 ha2ha
 
+// const vm = new MoonBitVM();
+// console.log(vm.eval('"haha" |> println')); // 输出 haha 返回 undefined
+// console.log(vm.eval("1 |> double()")); // 返回 2
+
 const vm = new MoonBitVM();
-console.log(vm.eval('"haha" |> println')); // 输出 haha 返回 undefined
-console.log(vm.eval("1 |> double()")); // 返回 2
+vm.eval('let str: String = "haha"');
+console.log(vm.eval("str")); // 返回 haha
 
 export { MoonBitVM, strictMode };

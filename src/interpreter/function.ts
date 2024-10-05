@@ -1,5 +1,4 @@
-import { MoonBitType } from "./types";
-import { MoonBitValue } from "./value";
+import { MoonBitType, MoonBitValue } from "./types";
 
 class MoonBitFunction extends MoonBitValue {
   type: MoonBitType = MoonBitType.Function;
