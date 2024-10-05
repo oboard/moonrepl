@@ -843,7 +843,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
           // console.log("func", func);
           result = func.value(result); // Call the function with the result
         } else {
-          throw new Error(`Function ${func} is not defined.`);
+          throw new Error(`Unsupported expression after the pipe operator`);
         }
       }
     }
@@ -877,6 +877,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const functionName = this.visit(ctx.functionName); // Get the function name
     const args = this.visit(ctx.tupleExpression); // Evaluate the arguments
     // console.log(args);
+    // console.log("functionName", functionName)
     return this.callFunction(functionName, args);
   }
 
@@ -896,6 +897,18 @@ class MoonBitInterpreter extends BaseCstVisitor {
         return func;
       }
       // 检查类型
+      if (args.length < func.args.length) {
+        return new MoonBitFunction(
+          func.args.slice(func.args.length - args.length),
+          func.returnType,
+          (...params) => {
+            return func.value(...params, ...args);
+          }
+        );
+        // throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
+      } else if (args.length > func.args.length) {
+        throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
+      }
       func.args.forEach((arg: any, idx: number) => {
         if (arg.type !== args[idx].type) {
           throw new Error(`Argument ${idx} is not ${arg.type}`);
@@ -1029,7 +1042,10 @@ let strictMode = false;
 
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
-// // vm.eval("fn main(a: Int,b:Int)->Int { 1+1 }");
 // console.log(vm.eval("add(1, 2)")); // 返回 3
+
+const vm = new MoonBitVM();
+vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+console.log(vm.eval("1 |> add(2,2)")); // 返回 3
 
 export { MoonBitVM, strictMode };
