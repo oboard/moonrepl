@@ -66,13 +66,15 @@ onMounted(() => {
         // 输出彩色字符
         term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`);
 
+
         let inputBuffer = ''; // 存储用户输入
+        let multilineBuffer = ''; // 存储多行输入
         let history: string[] = []; // 历史记录
         let historyIndex = -1; // 当前历史记录索引
         let cursorPosition = 0; // 光标位置
 
         const writePrompt = () => {
-            if (inputBuffer.indexOf("\n") !== -1) {
+            if (multilineBuffer.indexOf("\n") !== -1) {
                 term.write(`${GREEN}... ${RESET} `)
                 return;
             }
@@ -93,23 +95,18 @@ onMounted(() => {
         };
 
         const multilinePrompt = () => {
-            // Prevent default Enter behavior when Shift is pressed
-            inputBuffer += '\n'; // Append a new line character to the input
-            // refreshLine(); // Refresh the terminal to show the new line
-            // 移动光标到正确的位置，最后一行的长度减去现在的位置
-            const moveBack = term.buffer.active.cursorX
-            console.log("moveBack", moveBack);
-            if (moveBack > 0) {
-                term.write(`\x1b[${moveBack}D`);
-            }
-            writePrompt(); // 重新显示提示符
+            historyIndex = history.length;
+            history.push(inputBuffer);
+            inputBuffer = '';
+            writePrompt();
         }
 
         // 自定义事件处理程序，允许 Ctrl+V/Cmd+V 粘贴
         term.attachCustomKeyEventHandler((event) => {
-            console.log("event", event)
+            // console.log("event", event)
             if (event.key === 'Enter' && event.shiftKey && event.type === "keydown") {
                 term.write('\r\n'); // 换行
+                multilineBuffer += '\n' + inputBuffer;
                 multilinePrompt()
                 return false; // Prevent further processing of this Enter key
             }
@@ -129,28 +126,37 @@ onMounted(() => {
             const key = data;
             switch (key) {
                 case '\r': // 回车键
+                    term.write('\r\n'); // 换行
                     if (inputBuffer === 'clear') {
                         term.clear();
-                        inputBuffer = ''; // 清空输入缓冲区
+                        inputBuffer = multilineBuffer = ''; // 清空输入缓冲区
                         cursorPosition = 0; // 重置光标位置
                         writePrompt(); // 重新显示提示符
                         break;
                     }
-                    term.write('\r\n'); // 换行
+                    if (multilineBuffer.length > 0) {
+                        multilineBuffer += '\n' + inputBuffer;
+                    } else {
+                        multilineBuffer = inputBuffer;
+                    }
                     try {
-                        const result = vm.eval(inputBuffer); // 执行表达式
-                        // console.log(result);
+                        console.log("inputBuffer", inputBuffer);
+                        console.log("multilineBuffer", multilineBuffer)
+                        const result = vm.eval(multilineBuffer); // 执行表达式
                         if (result !== undefined) {
                             term.writeln(`${result}`); // 显示输入内容
                         }
+                        multilineBuffer = '';
                     } catch (e: unknown) {
                         if (e instanceof MoonBitError) {
                             if (e.type === MoonBitErrorType.MissingRCurly) {
+                                multilineBuffer += '\n';
                                 multilinePrompt();
                                 return;
                             }
                         }
                         term.writeln(`${RED}${e}${RESET}`);
+                        multilineBuffer = '';
                     }
 
                     if (inputBuffer) {

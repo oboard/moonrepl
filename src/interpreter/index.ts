@@ -538,6 +538,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
       ctx.argumentStatement?.map((argCtx: any) => this.visit(argCtx)) ?? []; // Get arguments
     const returnType = this.visit(ctx.typeStatement); // Get return type
     const block = ctx.blockStatement; // Get function block
+
+    this.checkBlockStatementClose(block[0].children);
+
     // console.log("functionName", functionName);
     // console.log("args", args);
     // console.log("returnType", returnType);
@@ -659,8 +662,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
     return value;
   }
 
-  blockStatement(ctx: any) {
-    console.log("blockStatement", ctx);
+  checkBlockStatementClose(ctx: any) {
+    // console.log("checkBlockStatementClose", ctx);
     if (ctx.LCurly && !ctx.RCurly) {
       throw new MoonBitError(
         ctx,
@@ -668,6 +671,11 @@ class MoonBitInterpreter extends BaseCstVisitor {
         MoonBitErrorType.MissingRCurly
       );
     }
+  }
+
+  blockStatement(ctx: any) {
+    // console.log("blockStatement", ctx);
+    this.checkBlockStatementClose(ctx);
     this.scopes.push({}); // Create a new scope
     const result = this.visit(ctx.row); // Visit all expressions in the block
     this.scopes.pop(); // Exit the scope
@@ -1137,5 +1145,9 @@ let strictMode = false;
 
 // const vm = new MoonBitVM();
 // vm.eval("if 1 < 2 {");
+
+
+// const vm = new MoonBitVM();
+// vm.eval("fn add(a: Int, b: Int) -> Int {");
 
 export { MoonBitVM, strictMode };
