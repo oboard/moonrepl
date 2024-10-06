@@ -5,7 +5,7 @@ import {
   tokenMatcher,
   CstNode,
 } from "chevrotain";
-import { MoonBitEnum, MoonBitFunctionType, MoonBitType, MoonBitValue } from "./types";
+import { MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitTrait, MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
 import { MoonBitError, MoonBitErrorType } from "./error";
 
@@ -343,34 +343,39 @@ class MoonBitPure extends CstParser {
       $.SUBRULE2($.typeStatement, { LABEL: "type" });
     });
 
+    $.RULE("enumMember", () => {
+      $.CONSUME(TypeName, { LABEL: "name" });
+      $.MANY(() => {
+        $.CONSUME(LParen);
+        $.MANY2(() => {
+          $.SUBRULE($.typeStatement, { LABEL: "associatedType" });
+          $.OPTION2(() => $.CONSUME2(Comma));
+        });
+        $.CONSUME(RParen);
+      });
+    });
+
+    $.RULE("deriveStatement", () => {
+      $.CONSUME(Derive);
+      $.CONSUME(LParen);
+      $.MANY(() => {
+        $.CONSUME(TypeName, { LABEL: "traitName" });
+        $.OPTION(() => $.CONSUME3(Comma));
+      });
+      $.CONSUME(RParen);
+    })
+
     $.RULE("enumStatement", () => {
       $.OPTION(() => $.CONSUME(Pub))
       $.CONSUME(Enum);
       $.CONSUME(TypeName, { LABEL: "name" });
       $.CONSUME(LCurly);
       $.MANY(() => {
-        $.CONSUME2(TypeName, { LABEL: "enumMember" });
-        $.MANY2(() => {
-          $.CONSUME(LParen);
-          $.MANY3(() => {
-            $.SUBRULE($.typeStatement, { LABEL: "enumType" });
-            $.OPTION2(() => $.CONSUME2(Comma));
-          });
-          $.CONSUME(RParen);
-        });
+        $.SUBRULE($.enumMember);
+        $.OPTION2(() => $.CONSUME2(Comma));
       });
       $.CONSUME(RCurly);
-
-      $.MANY4(() => {
-        $.CONSUME(Derive);
-        $.CONSUME2(LParen);
-        $.MANY5(() => {
-          $.CONSUME3(TypeName, { LABEL: "traitName" });
-          $.OPTION3(() => $.CONSUME3(Comma));
-        });
-        $.CONSUME2(RParen);
-      });
-
+      $.OPTION3(() => $.SUBRULE($.deriveStatement));
     });
 
     $.RULE("fnStatement", () => {
@@ -524,24 +529,20 @@ class MoonBitPure extends CstParser {
       $.SUBRULE($.typeStatement, { LABEL: "returnType" });
     });
 
-    $.RULE("typeStatement", () =>
+    $.RULE("typeStatement", () => {
       $.OR([
         { ALT: () => $.SUBRULE($.functionTypeStatement) },
-        {
-          ALT: () => $.MANY(() => {
-            $.CONSUME(TypeName);
-            $.MANY2(() => {
-              $.CONSUME(LBracket);
-              $.MANY3(() => {
-                $.SUBRULE2($.typeStatement, { LABEL: "genericType" });
-                $.OPTION2(() => $.CONSUME(Comma));
-              });
-              $.CONSUME(RBracket);
-            });
-          })
-        },
+        { ALT: () => $.CONSUME(TypeName) },
       ])
-    );
+      $.MANY2(() => {
+        $.CONSUME(LBracket);
+        $.MANY3(() => {
+          $.SUBRULE2($.typeStatement, { LABEL: "genericType" });
+          $.OPTION2(() => $.CONSUME(Comma));
+        });
+        $.CONSUME(RBracket);
+      })
+    });
 
     $.RULE("parenthesisExpression", () => {
       $.CONSUME(LParen);
@@ -592,7 +593,13 @@ class MoonBitPure extends CstParser {
   fnStatement(): CstNode {
     return notImplemented();
   }
+  deriveStatement(): CstNode {
+    return notImplemented();
+  }
   enumStatement(): CstNode {
+    return notImplemented();
+  }
+  enumMember(): CstNode {
     return notImplemented();
   }
   argumentStatement(): CstNode {
@@ -663,6 +670,7 @@ const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 
 class MoonBitInterpreter extends BaseCstVisitor {
   scopes: Record<string, MoonBitValue>[] = [{}]; // Initialize with a global scope
+  typeScopes: Record<string, MoonBitType>[] = [{}]; // Initialize with a global scope
 
   constructor() {
     super();
@@ -711,18 +719,27 @@ class MoonBitInterpreter extends BaseCstVisitor {
       this.visit(body);
     }
   }
+  enumMember(ctx: any) {
+    // console.log("enumMember", ctx);
+    const name = ctx.name[0].image; // Get enum value
+    const associatedTypes = ctx.associatedType?.map((typeCtx: any) => this.visit(typeCtx)); // Get associated types
+    return new MoonBitEnumMemberType(name, associatedTypes);
+  }
+
+  deriveStatement(ctx: any) {
+    const traits = ctx.trait.map((traitCtx: any) => this.visit(traitCtx)); // Get traits
+
+
+  }
+
+
   enumStatement(ctx: any) {
-    console.log("enumStatement", ctx);
-    const enumName = this.visit(ctx.name); // Get enum name
-    const variants = ctx.variant.map((variantCtx: any) => this.visit(variantCtx)); // Get variants
-
-    // Create a new enum object
-    const enumObj = new MoonBitEnum(variants);
-
-    console.log("enumName", enumName);
-
+    // console.log("enumStatement", ctx);
+    const name = ctx.name[0].image; // Get enum name
+    const values = ctx.enumMember.map((memberCtx: any) => this.visit(memberCtx)); // Get enum values
     // Assign the enum to the global scope
-    // return (this.scopes[0][enumName] = enumObj);
+    console.log(JSON.stringify(new MoonBitEnum(values), null, 2))
+    return (this.typeScopes[0][name] = new MoonBitEnum(name, values));
   }
 
   fnStatement(ctx: any) {
@@ -1272,7 +1289,7 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    console.log("cst", cst);
+    // console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
 
@@ -1391,8 +1408,6 @@ vm.eval(`pub enum Json {
   False
   Number(Double)
   String(String)
-  Array(Array[Json])
-  Object(Map[String, Json])
 } derive(Eq, ToJson, FromJson)`);
 
 

@@ -102,12 +102,41 @@ class MoonBitValue {
   }
 }
 
+class MoonBitEnumMemberType extends MoonBitType {
+  associatedTypes: MoonBitType[];
+  constructor(name: string, associatedTypes: MoonBitType[]) {
+    super(name);
+    this.associatedTypes = associatedTypes;
+  }
+
+  toString() {
+    return `${this.name}(${this.associatedTypes.join(", ")})`;
+  }
+}
+
+
+class MoonBitTrait {
+  name: string;
+  extends: MoonBitTrait[];
+
+  constructor(name: string, extendsTraits: MoonBitTrait[]) {
+    this.name = name;
+    this.extends = extendsTraits;
+  }
+
+  toString() {
+    return `trait ${this.name} extends ${this.extends.join(", ")}`;
+  }
+}
+
 class MoonBitEnum extends MoonBitType {
   values: MoonBitType[];
+  derives: MoonBitTrait[];
 
-  constructor(values: MoonBitType[]) {
-    super("Enum");
+  constructor(name: string, values: MoonBitType[], derives: MoonBitTrait[]) {
+    super(name);
     this.values = values;
+    this.derives = derives;
   }
 
   toString() {
@@ -115,6 +144,6 @@ class MoonBitEnum extends MoonBitType {
   }
 }
 
-export { MoonBitType, MoonBitEnum, MoonBitFunctionType, MoonBitValue };
+export { MoonBitType, MoonBitTrait, MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitValue };
 
 
