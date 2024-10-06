@@ -5,6 +5,7 @@ enum MoonBitErrorType {
   MissingReturnType = 3,
   UnsupportedExpressionAfterPipeOperator = 4,
   InvalidArgumentType = 5,
+  InvalidArgumentCount = 6,
 }
 
 class MoonBitError extends Error {

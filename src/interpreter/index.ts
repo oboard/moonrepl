@@ -364,7 +364,8 @@ class MoonBitPure extends CstParser {
 
       $.MANY(() => {
         $.CONSUME(Pipeline);
-        $.SUBRULE2($.expression, { LABEL: "rhs" });
+        $.SUBRULE2($.functionName, { LABEL: "rhs" });
+        $.OPTION(() => $.SUBRULE($.tupleExpression, { LABEL: "arguments" }));
       });
     });
 
@@ -1303,13 +1304,13 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (ctx.functionName) {
       const varName = this.visit(ctx.functionName); // Get the variable name
       return this.getVariable(varName);
-    } else if (ctx.visitStatement) {
+    } if (ctx.visitStatement) {
       return this.visit(ctx.visitStatement);
-    } else if (ctx.parenthesisExpression) {
+    } if (ctx.parenthesisExpression) {
       // passing an array to "this.visit" is equivalent
       // to passing the array's first element
       return this.visit(ctx.parenthesisExpression);
-    } else if (ctx.StringLiteral) {
+    } if (ctx.StringLiteral) {
       // console.log(ctx.StringLiteral[0].image);
       // 获取字符串值，去掉引号
       let strValue: string = ctx.StringLiteral[0].image.slice(1, -1);
@@ -1338,24 +1339,23 @@ class MoonBitInterpreter extends BaseCstVisitor {
       });
 
       return new MoonBitValue(strValue, MoonBitType.String);
-    } else if (ctx.IntegerLiteral) {
+    } if (ctx.IntegerLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return new MoonBitValue(
         Number.parseInt(ctx.IntegerLiteral[0].image, 10),
         MoonBitType.Int
       );
-    } else if (ctx.DoubleLiteral) {
+    } if (ctx.DoubleLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return new MoonBitValue(
         Number.parseFloat(ctx.DoubleLiteral[0].image),
         MoonBitType.Double
       );
-    } else if (ctx.functionCall) {
+    } if (ctx.functionCall) {
       // If a key exists on the ctx, at least one element is guaranteed
       return this.visit(ctx.functionCall);
-    } else {
-      console.log(ctx);
     }
+    console.log(ctx);
   }
 
   pipelineExpression(ctx: any) {
@@ -1364,7 +1364,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
     if (ctx.rhs) {
       for (let i = 0; i < ctx.rhs.length; i++) {
-        const func = this.visit(ctx.rhs[i]);
+        const func = this.getVariable(this.visit(ctx.rhs[i]));
+        const rhsArguments = this.visit(ctx.arguments) ?? [];
+        // console.log("rhsArguments", rhsArguments);
         // console.log(
         //   "func",
         //   func.value({
@@ -1375,9 +1377,16 @@ class MoonBitInterpreter extends BaseCstVisitor {
         // console.log(result)
 
         if (func instanceof MoonBitFunction) {
+
+          if (rhsArguments.length + 1 !== func.args.length) {
+            throw new MoonBitError(ctx,
+              `Expected ${func.args.length} arguments, got ${rhsArguments.length + 1}`,
+              MoonBitErrorType.InvalidArgumentCount
+            );
+          }
           // this.callFunction(func, result);
           // console.log("func", func);
-          result = func.value(result); // Call the function with the result
+          result = func.value(result, ...rhsArguments); // Call the function with the result
         } else {
           throw new MoonBitError(ctx, "Unsupported expression after the pipe operator", MoonBitErrorType.UnsupportedExpressionAfterPipeOperator);
         }
@@ -1441,18 +1450,20 @@ class MoonBitInterpreter extends BaseCstVisitor {
         return func;
       }
       // 检查类型
-      if (args.length < func.args.length) {
-        return new MoonBitFunction(
-          func.args.slice(func.args.length - args.length),
-          func.returnType,
-          (...params) => {
-            return func.value(...params, ...args);
-          }
-        );
-        // throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
-      } if (args.length > func.args.length) {
-        throw new Error(
-          `Expected ${func.args.length} arguments, got ${args.length}`
+      // if (args.length < func.args.length) {
+      //   return new MoonBitFunction(
+      //     func.args.slice(func.args.length - args.length),
+      //     func.returnType,
+      //     (...params) => {
+      //       return func.value(...params, ...args);
+      //     }
+      //   );
+      //   // throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
+      // } 
+      if (args.length !== func.args.length) {
+        throw new MoonBitError(args,
+          `Expected ${func.args.length} arguments, got ${args.length}`,
+          MoonBitErrorType.InvalidArgumentCount
         );
       }
       func.args.forEach((arg: any, idx: number) => {
