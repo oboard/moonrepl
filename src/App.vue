@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import "@xterm/xterm/css/xterm.css";
 import { MoonBitVM } from './interpreter/index';
+import { MoonBitError, MoonBitErrorType } from './interpreter/error';
 
 const vm = new MoonBitVM();
 
@@ -65,35 +66,20 @@ onMounted(() => {
         // 输出彩色字符
         term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`);
 
-        term.registerLinkProvider({
-            provideLinks(bufferLineNumber, callback) {
-                switch (bufferLineNumber) {
-                    case 0:
-                        callback([
-                            {
-                                text: 'oboard',
-                                range: { start: { x: 28, y: 2 }, end: { x: 34, y: 2 } },
-                                activate() {
-                                    window.open('https://github.com/oboard', '_blank');
-                                }
-                            },
-                        ]);
-                        return;
-                }
-                callback(undefined);
-            }
-        });
-
-
-        const writePrompt = () => {
-            term.write(`${GREEN}❯ ${RESET}`); // 显示提示符
-        };
-        writePrompt();
-
         let inputBuffer = ''; // 存储用户输入
         let history: string[] = []; // 历史记录
         let historyIndex = -1; // 当前历史记录索引
         let cursorPosition = 0; // 光标位置
+
+        const writePrompt = () => {
+            if (inputBuffer.indexOf("\n") !== -1) {
+                term.write(`${GREEN}... ${RESET} `)
+                return;
+            }
+            term.write(`${GREEN}❯ ${RESET}`); // 显示提示符
+        };
+        writePrompt();
+
 
         const refreshLine = () => {
             term.write('\r\x1b[K'); // 清除当前行
@@ -106,9 +92,32 @@ onMounted(() => {
             }
         };
 
+        const multilinePrompt = () => {
+            // Prevent default Enter behavior when Shift is pressed
+            inputBuffer += '\n'; // Append a new line character to the input
+            // refreshLine(); // Refresh the terminal to show the new line
+            // 移动光标到正确的位置，最后一行的长度减去现在的位置
+            const moveBack = term.buffer.active.cursorX
+            console.log("moveBack", moveBack);
+            if (moveBack > 0) {
+                term.write(`\x1b[${moveBack}D`);
+            }
+            writePrompt(); // 重新显示提示符
+        }
 
         // 自定义事件处理程序，允许 Ctrl+V/Cmd+V 粘贴
         term.attachCustomKeyEventHandler((event) => {
+            console.log("event", event)
+            if (event.key === 'Enter' && event.shiftKey && event.type === "keydown") {
+                term.write('\r\n'); // 换行
+                multilinePrompt()
+                return false; // Prevent further processing of this Enter key
+            }
+
+            if (event.key === 'Enter' && event.type === "keypress") {
+                return false;
+            }
+
             if ((event.ctrlKey || event.metaKey) && event.key === "v") {
                 return true; // 允许 Ctrl+V 或 Cmd+V 粘贴
             }
@@ -120,7 +129,6 @@ onMounted(() => {
             const key = data;
             switch (key) {
                 case '\r': // 回车键
-                    term.write('\r\n'); // 换行
                     if (inputBuffer === 'clear') {
                         term.clear();
                         inputBuffer = ''; // 清空输入缓冲区
@@ -128,15 +136,23 @@ onMounted(() => {
                         writePrompt(); // 重新显示提示符
                         break;
                     }
+                    term.write('\r\n'); // 换行
                     try {
                         const result = vm.eval(inputBuffer); // 执行表达式
                         // console.log(result);
                         if (result !== undefined) {
                             term.writeln(`${result}`); // 显示输入内容
                         }
-                    } catch (e) {
-                        term.writeln(`${RED}${e}${RESET}`); // 显示输入内容
+                    } catch (e: unknown) {
+                        if (e instanceof MoonBitError) {
+                            if (e.type === MoonBitErrorType.MissingRCurly) {
+                                multilinePrompt();
+                                return;
+                            }
+                        }
+                        term.writeln(`${RED}${e}${RESET}`);
                     }
+
                     if (inputBuffer) {
                         history.push(inputBuffer); // 将输入内容添加到历史记录
                         historyIndex = history.length; // 重置历史索引
@@ -203,7 +219,8 @@ onMounted(() => {
                     inputBuffer =
                         inputBuffer.slice(0, cursorPosition) + key + inputBuffer.slice(cursorPosition);
                     cursorPosition++; // 光标位置向右移动一位
-                    refreshLine(); // 刷新行
+                    term.write(key); // 显示输入内容
+                    // refreshLine(); // 刷新行
                     break;
             }
         });

@@ -21,8 +21,8 @@ Progress:
 - [x] Types Check
 - [x] Functions
 - [ ] While Statement
-- [ ] For Statement
-- [ ] Match Statement
-- [ ] Match Expression
 - [ ] Enum
 - [ ] Struct
+- [ ] For Statement
+- [ ] Loop Statement
+- [ ] Match Statement

@@ -7,6 +7,7 @@ import {
 } from "chevrotain";
 import { MoonBitFunctionType, MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
+import { MoonBitError, MoonBitErrorType } from "./error";
 
 // actual Tokens that can appear in the text
 const AdditionOperator = createToken({
@@ -99,7 +100,18 @@ const If = createToken({
   name: "If",
   pattern: /if/,
 });
-
+const While = createToken({
+  name: "While",
+  pattern: /while/,
+});
+const For = createToken({
+  name: "For",
+  pattern: /for/,
+});
+const Match = createToken({
+  name: "Match",
+  pattern: /match/,
+});
 const ComparisonOperator = createToken({
   name: "ComparisonOperator",
   pattern: Lexer.NA,
@@ -213,6 +225,9 @@ const allTokens = [
   Arrow,
   If,
   Else,
+  While,
+  For,
+  Match,
   LCurly,
   RCurly,
   Plus,
@@ -317,7 +332,7 @@ class MoonBitPure extends CstParser {
       //   $.OPTION(() => $.CONSUME(Semicolon)); // Optional semicolon
       // });
       $.SUBRULE($.row);
-      $.CONSUME(RCurly);
+      $.OPTION(() => $.CONSUME(RCurly));
     });
 
     $.RULE("letStatement", () => {
@@ -522,7 +537,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const args: MoonBitArgument[] =
       ctx.argumentStatement?.map((argCtx: any) => this.visit(argCtx)) ?? []; // Get arguments
     const returnType = this.visit(ctx.typeStatement); // Get return type
-    const block = ctx.blockStatement[0]; // Get function block
+    const block = ctx.blockStatement; // Get function block
     // console.log("functionName", functionName);
     // console.log("args", args);
     // console.log("returnType", returnType);
@@ -570,7 +585,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // return condition;
     if (condition) {
       // If the condition is true, evaluate the 'then' block
-      return this.visit(ctx.blockStatement[0]);
+      return this.visit(ctx.blockStatement);
     } else {
       // Check for else if or else
       // ctx.ifStatement?.forEach((elseIfCtx: any) => {
@@ -578,13 +593,13 @@ class MoonBitInterpreter extends BaseCstVisitor {
         for (let i = 0; i < ctx.elseifStatement.length; i++) {
           const elseIfCtx = ctx.elseifStatement[i].children;
           // console.log("elseIfCtx", elseIfCtx);
-          const elseIfCondition = this.visit(elseIfCtx.comparisonExpression[0]); // Evaluate else if condition
+          const elseIfCondition = this.visit(elseIfCtx.comparisonExpression); // Evaluate else if condition
           if (elseIfCondition) {
             // If else if condition is true, evaluate the 'else if' block
-            return this.visit(elseIfCtx.blockStatement[0]);
+            return this.visit(elseIfCtx.blockStatement);
           }
           if (elseIfCtx.elseStatement) {
-            return this.visit(elseIfCtx.elseStatement[0]);
+            return this.visit(elseIfCtx.elseStatement);
           }
         }
       }
@@ -645,7 +660,14 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   blockStatement(ctx: any) {
-    // console.log("blockStatement", ctx);
+    console.log("blockStatement", ctx);
+    if (ctx.LCurly && !ctx.RCurly) {
+      throw new MoonBitError(
+        ctx,
+        "missing `}`",
+        MoonBitErrorType.MissingRCurly
+      );
+    }
     this.scopes.push({}); // Create a new scope
     const result = this.visit(ctx.row); // Visit all expressions in the block
     this.scopes.pop(); // Exit the scope
@@ -737,33 +759,33 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("comparisonExpression", ctx, result);
     // "rhs" key may be undefined as the grammar defines it as optional (MANY === zero or more).
     if (ctx.rhs) {
-      ctx.rhs.forEach(
-        (rhsOperand: CstNode | CstNode[], idx: string | number) => {
-          // there will be one operator for each rhs operand
-          let rhsValue = this.visit(rhsOperand);
-          let operator = ctx.ComparisonOperator[idx];
+      ctx.rhs.forEach((rhsOperand: CstNode | CstNode[], idx: number) => {
+        // there will be one operator for each rhs operand
+        let rhs = this.visit(rhsOperand);
+        let rhsValue = rhs.value;
+        let operator = ctx.ComparisonOperator[idx];
+        let lhsValue = result.value;
 
-          let lhsValue = result.value;
+        MoonBitType.checkValueTypeWithError(rhs, result.type);
 
-          if (tokenMatcher(operator, GreaterThan)) {
-            result = lhsValue > rhsValue;
-          } else if (tokenMatcher(operator, LessThan)) {
-            result = lhsValue < rhsValue;
-          } else if (tokenMatcher(operator, EqualEqual)) {
-            result = lhsValue === rhsValue;
-          } else if (tokenMatcher(operator, NotEqual)) {
-            result = lhsValue !== rhsValue;
-          } else if (tokenMatcher(operator, GreaterThanOrEqual)) {
-            result = lhsValue >= rhsValue;
-          } else if (tokenMatcher(operator, LessThanOrEqual)) {
-            result = lhsValue <= rhsValue;
-          } else {
-            return result;
-          }
-
-          result = new MoonBitValue(result, MoonBitType.Bool);
+        if (tokenMatcher(operator, GreaterThan)) {
+          result = lhsValue > rhsValue;
+        } else if (tokenMatcher(operator, LessThan)) {
+          result = lhsValue < rhsValue;
+        } else if (tokenMatcher(operator, EqualEqual)) {
+          result = lhsValue === rhsValue;
+        } else if (tokenMatcher(operator, NotEqual)) {
+          result = lhsValue !== rhsValue;
+        } else if (tokenMatcher(operator, GreaterThanOrEqual)) {
+          result = lhsValue >= rhsValue;
+        } else if (tokenMatcher(operator, LessThanOrEqual)) {
+          result = lhsValue <= rhsValue;
+        } else {
+          return result;
         }
-      );
+
+        result = new MoonBitValue(result, MoonBitType.Bool);
+      });
     }
     // console.log("result", result);
     return result;
@@ -1112,5 +1134,8 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
 // vm.eval('add(1,"2")'); // Type mismatch: expected [Int], got [String]
+
+// const vm = new MoonBitVM();
+// vm.eval("if 1 < 2 {");
 
 export { MoonBitVM, strictMode };
