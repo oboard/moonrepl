@@ -6,7 +6,7 @@ MoonRepl is an interpreter for the MoonBit programming language. It is an unoffi
 
 ## Try
 
-### Online (Recommanded)
+### Online (Recommended)
 https://moonrepl.oboard.eu.org/
 
 ### Local
