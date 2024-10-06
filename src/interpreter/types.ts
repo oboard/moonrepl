@@ -23,6 +23,7 @@ class MoonBitType {
   static Bool = new MoonBitType("Bool");
   static Char = new MoonBitType("Char");
   static Function = new MoonBitType("Function");
+  static Self = new MoonBitType("Self");
 
   constructor(name: string) {
     this.name = name;
@@ -42,6 +43,8 @@ class MoonBitType {
         return MoonBitType.Bool;
       case "Char":
         return MoonBitType.Char;
+      case "Self":
+        return MoonBitType.Self;
       default:
         throw new Error(`Unknown type: ${strType}`);
     }
@@ -114,13 +117,14 @@ class MoonBitEnumMemberType extends MoonBitType {
   }
 }
 
-
 class MoonBitTrait {
   name: string;
+  members: MoonBitFunctionType[];
   extends: MoonBitTrait[];
 
-  constructor(name: string, extendsTraits: MoonBitTrait[]) {
+  constructor(name: string, members: MoonBitFunctionType[], extendsTraits: MoonBitTrait[]) {
     this.name = name;
+    this.members = members;
     this.extends = extendsTraits;
   }
 

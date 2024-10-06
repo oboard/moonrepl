@@ -1,6 +1,7 @@
 enum MoonBitErrorType {
   MissingRCurly,
   TypeMismatch,
+  TraitNotFound,
 }
 
 class MoonBitError extends Error {

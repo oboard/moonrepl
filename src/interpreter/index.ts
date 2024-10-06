@@ -98,29 +98,10 @@ const DoubleLiteral = createToken({
   pattern: /\d+\.\d+/,
 });
 
-// const EscapeSequence = createToken({
-//   name: "EscapeSequence",
-//   pattern: /\\[nt"\\]/, // 处理常见的转义字符：\n, \t, \", \\
-// });
-
-// const DoubleQuote = createToken({
-//   name: "DoubleQuote",
-//   pattern: /"/,
-// });
 const TypeName = createToken({
   name: "TypeName",
   pattern: /[A-Z][a-zA-Z0-9_]*/,
 });
-
-// const TraitName = createToken({
-//   name: "TraitName",
-//   pattern: /[A-Z][a-zA-Z0-9_]*/,
-// });
-
-// const EnumMember = createToken({
-//   name: "TraitName",
-//   pattern: /[A-Z][a-zA-Z0-9_]*/,
-// });
 
 const FunctionName = createToken({
   name: "FunctionName",
@@ -411,13 +392,30 @@ class MoonBitPure extends CstParser {
       $.OPTION(() => $.CONSUME(Pub));
       $.CONSUME(Trait);
       $.CONSUME(TypeName, { LABEL: "name" });
-      $.CONSUME(LCurly);
       $.MANY(() => {
-        $.SUBRULE($.traitStatement);
+        $.CONSUME(Colon)
+        $.CONSUME2(TypeName, { LABEL: "extends" });
+      });
+      $.CONSUME(LCurly);
+      $.MANY2(() => {
+        $.SUBRULE($.traitMemberStatement);
         $.OPTION2(() => $.CONSUME2(Comma));
       });
       $.CONSUME(RCurly);
       $.OPTION3(() => $.SUBRULE($.deriveStatement));
+    });
+
+    // op_equal(Self, Self) -> Bool
+    $.RULE("traitMemberStatement", () => {
+      $.SUBRULE($.functionName);
+      $.CONSUME(LParen);
+      $.MANY(() => {
+        $.SUBRULE2($.typeStatement, { LABEL: "arg" });
+        $.OPTION2(() => $.CONSUME2(Comma));
+      });
+      $.CONSUME(RParen);
+      $.CONSUME(Arrow);
+      $.SUBRULE($.typeStatement, { LABEL: "returnType" });
     });
 
     $.RULE("testStatement", () => {
@@ -457,6 +455,9 @@ class MoonBitPure extends CstParser {
     $.RULE("expression", () => {
       $.OR([
         { ALT: () => $.SUBRULE($.fnStatement) },
+        { ALT: () => $.SUBRULE($.structStatement) },
+        { ALT: () => $.SUBRULE($.traitStatement) },
+        { ALT: () => $.SUBRULE($.testStatement) },
         { ALT: () => $.SUBRULE($.letStatement) },
         { ALT: () => $.SUBRULE($.enumStatement) },
         { ALT: () => $.SUBRULE($.ifStatement) },
@@ -679,6 +680,9 @@ class MoonBitPure extends CstParser {
   testStatement(): CstNode {
     return notImplemented();
   }
+  traitMemberStatement(): CstNode {
+    return notImplemented();
+  }
   functionTypeStatement(): CstNode {
     return notImplemented();
   }
@@ -776,6 +780,31 @@ class MoonBitInterpreter extends BaseCstVisitor {
     }
   }
 
+  traitMemberStatement(ctx: any) {
+    // console.log("traitMemberStatement", ctx);
+    const argsType = ctx.arg?.map((typeCtx: any) => this.visit(typeCtx)); // Get args type
+    const returnType = this.visit(ctx.returnType); // Get return type
+    return new MoonBitFunctionType(argsType, returnType);
+  }
+
+  traitStatement(ctx: any) {
+    // console.log("traitStatement", ctx);
+    const name = ctx.name[0].image; // Get trait name
+    const members = ctx.traitMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
+    const extend = ctx.extends?.map((traitCtx: any) => this.visit(traitCtx)); // Get extends
+    // const 
+    this.checkBlockStatementClose(ctx);
+
+    // Execute the body while the condition is true
+    const trait = new MoonBitTrait(name, members, extend);
+
+    // Store the trait in the traitScopes
+    this.traitScopes[0][name] = trait;
+  }
+  structStatement(ctx: any) {
+
+  }
+
   matchStatement(ctx: any) {
     // console.log("matchStatement", ctx);
     const condition = this.visit(ctx.condition); // Get condition
@@ -796,13 +825,13 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   deriveStatement(ctx: any) {
-    console.log("deriveStatement", ctx);
+    // console.log("deriveStatement", ctx);
     const traitNames = ctx.traitName.map((traitCtx: any) => traitCtx.image); // Get traits
 
     const traits = traitNames.map((traitName: string) => {
       const trait = this.getTrait(traitName);
       if (!trait) {
-        throw new Error(`Trait ${traitName} not found.`);
+        throw new MoonBitError(ctx, `Trait ${traitName} not found.`, MoonBitErrorType.TraitNotFound);
       }
       return trait;
     });
@@ -821,7 +850,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const values = ctx.enumMember.map((memberCtx: any) => this.visit(memberCtx)); // Get enum values
     const derives = ctx.deriveStatement?.map((deriveCtx: any) => this.visit(deriveCtx)); // Get derives
     // Assign the enum to the global scope
-    console.log(JSON.stringify(new MoonBitEnum(name, values, derives), null, 2))
+    // console.log(JSON.stringify(new MoonBitEnum(name, values, derives), null, 2))
     return (this.typeScopes[0][name] = new MoonBitEnum(name, values, derives));
   }
 
@@ -873,6 +902,12 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const argName = this.visit(ctx.name); // Get argument name
     const argType = this.visit(ctx.type); // Get argument type
     return new MoonBitArgument(argName, argType);
+  }
+
+  testStatement(ctx: any) {
+    // console.log("testStatement", ctx);
+    const test = this.visit(ctx.blockStatement); // Evaluate condition
+    return test;
   }
 
   ifStatement(ctx: any) {
@@ -1018,6 +1053,12 @@ class MoonBitInterpreter extends BaseCstVisitor {
       return this.visit(ctx.fnStatement);
     } else if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
+    } else if (ctx.traitStatement) {
+      return this.visit(ctx.traitStatement);
+    } else if (ctx.testStatement) {
+      return this.visit(ctx.testStatement);
+    } else if (ctx.structStatement) {
+      return this.visit(ctx.structStatement);
     } else if (ctx.ifStatement) {
       return this.visit(ctx.ifStatement);
     } else if (ctx.enumStatement) {
@@ -1485,13 +1526,21 @@ let strictMode = false;
 
 
 const vm = new MoonBitVM();
-vm.eval(`pub enum Json {
+vm.eval(`
+pub trait Eq {
+  op_equal(Self, Self) -> Bool
+}
+  
+
+  
+pub enum Json {
   Null
   True
   False
   Number(Double)
   String(String)
-} derive(Eq, ToJson, FromJson)`);
+} derive(Eq)
+`);
 
 
 
