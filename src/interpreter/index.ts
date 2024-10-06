@@ -538,6 +538,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
         // console.log("args", args);
         // console.log("params", params);
         params.forEach((arg: MoonBitValue, idx: number) => {
+          MoonBitType.checkValueTypeWithError(arg, args[idx].type);
+
           this.scopes[this.scopes.length - 1][args[idx].name] = arg;
         });
 
@@ -713,6 +715,10 @@ class MoonBitInterpreter extends BaseCstVisitor {
           let rhsValue = this.visit(rhsOperand);
           let operator = ctx.AdditionOperator[idx];
 
+          // console.log("result", result);
+          // console.log("operator", operator);
+          // console.log("rhsValue", rhsValue);
+          MoonBitType.checkValueTypeWithError(rhsValue, result.type);
           if (tokenMatcher(operator, Plus)) {
             result += rhsValue;
           } else {
@@ -773,6 +779,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
           // there will be one operator for each rhs operand
           let rhsValue = this.visit(rhsOperand);
           let operator = ctx.MultiplicationOperator[idx];
+
+          MoonBitType.checkValueTypeWithError(rhsValue, result.type);
 
           if (tokenMatcher(operator, Multi)) {
             result *= rhsValue;
@@ -1091,8 +1099,18 @@ let strictMode = false;
 // vm.eval("fn echo(str: String) -> Unit { println(str) }");
 // vm.eval("echo(\"hello\")"); // 输出 hello
 
+// const vm = new MoonBitVM();
+// vm.eval("fn echo() -> (String) -> Unit { println }");
+// vm.eval('echo()("hello")'); // 输出 hello
+
+// const vm = new MoonBitVM();
+// vm.eval('1 + "2"'); // Type mismatch: expected [Int], got [String]
+
+// const vm = new MoonBitVM();
+// vm.eval('1 * "2"'); // Type mismatch: expected [Int], got [String]
+
 const vm = new MoonBitVM();
-vm.eval("fn echo() -> (String) -> Unit { println }");
-vm.eval('echo()("hello")'); // 输出 hello
+vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+vm.eval('add(1,"2")'); // Type mismatch: expected [Int], got [String]
 
 export { MoonBitVM, strictMode };
