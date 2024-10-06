@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount, ref } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import "@xterm/xterm/css/xterm.css";
-import { MoonBitVM } from './interpreter/index';
+import { MoonBitVM, helloWorld } from './interpreter/index';
 import { MoonBitError, MoonBitErrorType } from './interpreter/error';
 import { MoonBitFunction } from './interpreter/function';
 import { MoonBitType, MoonBitValue } from './interpreter/types';
@@ -14,7 +14,7 @@ const vm = new MoonBitVM();
 // ANSI 转义码定义
 const RESET = "\x1b[0m";
 const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
+// const YELLOW = "\x1b[33m";
 const RED = "\x1b[31m";
 // const BLUE = "\x1b[34m";
 // const MAGENTA = "\x1b[35m";
