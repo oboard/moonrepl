@@ -9,6 +9,13 @@ import { MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitMap, Mo
 import { MoonBitArgument, MoonBitFunction } from "./function";
 import { MoonBitError, MoonBitErrorType } from "./error";
 
+const RESET = "\x1b[0m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const RED = "\x1b[31m";
+
+export const helloWorld = `${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`
+
 // actual Tokens that can appear in the text
 const AdditionOperator = createToken({
   name: "AdditionOperator",
@@ -109,7 +116,7 @@ const TypeName = createToken({
 
 const FunctionName = createToken({
   name: "FunctionName",
-  pattern: /[a-z_][a-zA-Z0-9_]*/,
+  pattern: /[a-z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*/,
 });
 const If = createToken({
   name: "If",
@@ -860,7 +867,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     this.typeScopes[0][name] = trait;
   }
   structMemberStatement(ctx: any) {
-    console.log("structMemberStatement", ctx);
+    // console.log("structMemberStatement", ctx);
     const name = this.visit(ctx.name); // Get struct member name
     const type = this.visit(ctx.type); // Get type
     const options = {
@@ -872,7 +879,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   structStatement(ctx: any) {
     this.checkBlockStatementClose(ctx);
-    console.log("structStatement", ctx);
+    // console.log("structStatement", ctx);
     const name = ctx.name[0].image; // Get struct name
     const members = ctx.structMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     const derives = this.visit(ctx.deriveStatement); // Get derives

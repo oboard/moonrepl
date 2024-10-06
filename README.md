@@ -2,9 +2,34 @@
 
 MoonBit Interpreter (Unofficial)
 
+MoonRepl is an interpreter for the MoonBit programming language. It is an unofficial implementation of the MoonBit programming language. It is written in TypeScript.
+
 ![MoonRepl Preview Image](screenshots/1.png)
 
-Progress:
+## Try
+
+### Online
+https://moonrepl.oboard.eu.org/
+
+### Local
+1. Clone the repository
+```bash
+git clone https://github.com/oboard/moonrepl.git
+```
+2. Install dependencies
+```bash
+npm install
+yarn install
+pnpm install
+bun install
+```
+3. Start the program
+```bash
+deno run --allow-read --allow-write entry.ts
+bun entry.ts
+```
+
+## Features
 
 - [x] Addition Expressions 加法运算
 - [x] Subtraction Expressions 减法运算

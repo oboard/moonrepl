@@ -8,6 +8,7 @@ import { MoonBitError, MoonBitErrorType } from './interpreter/error';
 import { MoonBitFunction } from './interpreter/function';
 import { MoonBitType, MoonBitValue } from './interpreter/types';
 
+
 const vm = new MoonBitVM();
 
 // ANSI 转义码定义
@@ -19,6 +20,8 @@ const RED = "\x1b[31m";
 // const MAGENTA = "\x1b[35m";
 // const CYAN = "\x1b[36m";
 // const WHITE = "\x1b[37m";
+
+
 
 // Create a ref for the terminal element
 const terminalRef = ref<HTMLElement | null>(null);
@@ -85,7 +88,7 @@ onMounted(() => {
         window.addEventListener('resize', handleResize);
 
         // 输出彩色字符
-        term.writeln(`${GREEN}Welcome to MoonRepl! ${YELLOW}Made with ${RED}❤️${YELLOW} by oboard${RESET}`);
+        term.writeln(helloWorld);
 
 
         let inputBuffer = ''; // 存储用户输入
