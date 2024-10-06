@@ -19,6 +19,7 @@ Progress:
 - [x] Function Types
 - [x] If Statement
 - [x] Types Check
+- [x] Multiline Input
 - [x] Functions
 - [ ] While Statement
 - [ ] Enum
