@@ -1,7 +1,9 @@
 import readline from 'node:readline';
 import process from 'node:process';
+import chalk from 'chalk';
 import { MoonBitVM, helloWorld } from './src/interpreter/index.ts';
 import { MoonBitError, MoonBitErrorType } from './src/interpreter/error.ts';
+import { MoonBitType, MoonBitValue } from './src/interpreter/types.ts';
 
 console.log(helloWorld);
 let accumulatedInput = ''; // 存储多行输入
@@ -21,7 +23,7 @@ function evaluateExpression(expression) {
 
     // console.log(`Evaluating: ${accumulatedInput}`)
     const result = vm.eval(accumulatedInput);
-    if (result !== undefined) {
+    if (result instanceof MoonBitValue && result.type !== MoonBitType.Unit) {
         console.log(`${result}`);
     }
     accumulatedInput = '';
@@ -41,6 +43,7 @@ rl.on('line', (input) => {
         } else {
             evaluateExpression(input); // 计算输入的表达式
         }
+        accumulatedInput = ''; // 表达式计算完成后清空累积的表达式
     } catch (e: unknown) {
         if (e instanceof MoonBitError) {
             if (e.type === MoonBitErrorType.MissingRCurly) {
@@ -50,6 +53,7 @@ rl.on('line', (input) => {
             }
         }
         console.error(`${e}`);
+        accumulatedInput = '';
     }
     rl.setPrompt('> ');
     rl.prompt(); // 再次显示提示符
@@ -59,11 +63,22 @@ let confirmClose = false;
 
 // 处理 ctrl-c 事件
 rl.on('SIGINT', () => {
+    // 如果已经输入了内容，则抛弃输入内容，并显示提示符
+    if (rl.line.length > 0 || accumulatedInput.length > 0) {
+        // 抛弃输入内容
+        accumulatedInput = '';
+        // 换行
+        console.log();
+        rl.line = '';
+        // 显示提示符
+        rl.setPrompt('> ');
+        rl.prompt();
+        return;
+    }
     if (confirmClose) {
-        console.log('Exiting MoonREPL');
-        process.exit(0);
+        rl.close();
     } else {
-        console.log('Press Ctrl-C again to exit');
+        console.log(chalk.cyan('🔄 Press ') + chalk.yellowBright('Ctrl-C ') + chalk.cyan('again to exit 🛑'));
         confirmClose = true;
         setTimeout(() => {
             confirmClose = false;
@@ -74,6 +89,6 @@ rl.on('SIGINT', () => {
 
 // 处理退出事件
 rl.on('close', () => {
-    console.log('Exiting MoonREPL');
+    console.log(chalk.blueBright('🌙✨ ') + chalk.yellow('Byebye~ ') + chalk.magentaBright('MoonREPL! ') + chalk.green('👋😊'));
     process.exit(0);
 });
