@@ -859,8 +859,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
     this.typeScopes[0][name] = trait;
   }
   structMemberStatement(ctx: any) {
-    // console.log("structMemberStatement", ctx);
-    const name = ctx.name[0].image; // Get struct name
+    console.log("structMemberStatement", ctx);
+    const name = this.visit(ctx.name); // Get struct member name
     const type = this.visit(ctx.type); // Get type
     const options = {
       isMutable: ctx.Mut !== undefined,
@@ -903,9 +903,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
   mapEntryStatement(ctx: any) {
     // console.log("mapEntryStatement", ctx);
-    const key = this.visit(ctx.key); // Get key
+    const key = new MoonBitValue(this.visit(ctx.key), MoonBitType.String); // Get key
     const value = this.visit(ctx.value); // Get value
-
     return new MoonBitMapEntry(key, value);
   }
   visitStatement(ctx: any) {
@@ -1520,7 +1519,7 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    console.log("cst", cst);
+    // console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
 
