@@ -24,8 +24,9 @@ pnpm install
 bun install
 ```
 3. Start the program
+#### Run .ts file with Deno or Bun.js
 ```bash
-deno run --allow-read --allow-write entry.ts
+deno run --allow-read --allow-write --unstable-sloppy-imports --allow-env
 bun entry.ts
 ```
 

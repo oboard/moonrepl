@@ -1,5 +1,5 @@
-import readline from 'readline';
-import process from 'process';
+import readline from 'node:readline';
+import process from 'node:process';
 import { MoonBitVM, helloWorld } from './src/interpreter/index.ts';
 import { MoonBitError, MoonBitErrorType } from './src/interpreter/error.ts';
 
