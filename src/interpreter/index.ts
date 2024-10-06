@@ -1109,8 +1109,8 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval('1 * "2"'); // Type mismatch: expected [Int], got [String]
 
-const vm = new MoonBitVM();
-vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
-vm.eval('add(1,"2")'); // Type mismatch: expected [Int], got [String]
+// const vm = new MoonBitVM();
+// vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
+// vm.eval('add(1,"2")'); // Type mismatch: expected [Int], got [String]
 
 export { MoonBitVM, strictMode };

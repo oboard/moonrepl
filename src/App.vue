@@ -130,8 +130,10 @@ onMounted(() => {
                     }
                     try {
                         const result = vm.eval(inputBuffer); // 执行表达式
-                        console.log(result);
-                        term.writeln(`${result}`); // 显示输入内容
+                        // console.log(result);
+                        if (result !== undefined) {
+                            term.writeln(`${result}`); // 显示输入内容
+                        }
                     } catch (e) {
                         term.writeln(`${RED}${e}${RESET}`); // 显示输入内容
                     }
