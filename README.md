@@ -22,7 +22,7 @@ Progress:
 - [x] Multiline Input
 - [x] Functions
 - [x] While Statement
-- [ ] For Statement
+- [x] For Statement
 - [ ] Enum
 - [ ] Struct
 - [ ] Loop Statement

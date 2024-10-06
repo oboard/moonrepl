@@ -338,10 +338,14 @@ class MoonBitPure extends CstParser {
       $.SUBRULE($.blockStatement, { LABEL: "body" });
     });
 
-    // for
+    // for i = n - 1; i > 0; i = i - 1 { }
     $.RULE("forStatement", () => {
       $.CONSUME(For);
-      $.SUBRULE($.expression, { LABEL: "condition" });
+      $.SUBRULE($.expression, { LABEL: "initialization" });
+      $.CONSUME(Semicolon);
+      $.SUBRULE2($.expression, { LABEL: "condition" });
+      $.CONSUME2(Semicolon);
+      $.SUBRULE3($.expression, { LABEL: "iteration" });
       $.SUBRULE($.blockStatement, { LABEL: "body" });
     });
 
@@ -593,14 +597,16 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   forStatement(ctx: any) {
-    // console.log("forStatement", ctx);
-    const condition = this.visit(ctx.condition); // Get condition
+    console.log("forStatement", ctx);
+    const initialization = ctx.initialization; // Get initialization
+    const condition = ctx.condition; // Get condition
+    const iteration = ctx.iteration; // Get iteration
     const body = ctx.body; // Get body
 
     this.checkBlockStatementClose(body[0].children);
 
     // Execute the body while the condition is true
-    for (let i = 0; this.visit(condition); i++) {
+    for (this.visit(initialization); this.visit(condition).value; this.visit(iteration)) {
       this.visit(body);
     }
   }
@@ -1226,9 +1232,9 @@ let strictMode = false;
 // console.log(vm.eval("add(1, 2)")); // 返回 3
 
 
-const vm = new MoonBitVM();
-vm.eval("fn double(x: Int) -> Int { x*2 }");
-console.log(vm.eval("double(2)")); // 返回 3
+// const vm = new MoonBitVM();
+// vm.eval("fn double(x: Int) -> Int { x*2 }");
+// console.log(vm.eval("double(2)")); // 返回 4
 
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
@@ -1267,5 +1273,12 @@ console.log(vm.eval("double(2)")); // 返回 3
 
 // const vm = new MoonBitVM();
 // vm.eval("1.1+1.0 |> println"); // 输出 2.1
+
+
+// const vm = new MoonBitVM();
+// vm.eval(`for i = 0; i < 10; i=i+1 {
+//   println(i) 
+// }`); // 输出 0 到 9
+
 
 export { MoonBitVM, strictMode };
