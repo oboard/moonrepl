@@ -318,6 +318,7 @@ const allTokens = [
   Equal,
   LParen,
   RParen,
+  Path,
   DoubleLiteral,
   IntegerLiteral,
   StringLiteral,
