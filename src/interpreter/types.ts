@@ -102,4 +102,19 @@ class MoonBitValue {
   }
 }
 
-export { MoonBitType, MoonBitFunctionType, MoonBitValue };
+class MoonBitEnum extends MoonBitType {
+  values: MoonBitType[];
+
+  constructor(values: MoonBitType[]) {
+    super("Enum");
+    this.values = values;
+  }
+
+  toString() {
+    return `[\n  ${this.values.map((value) => value.toString()).join(",\n  ")}\n]`;
+  }
+}
+
+export { MoonBitType, MoonBitEnum, MoonBitFunctionType, MoonBitValue };
+
+

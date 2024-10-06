@@ -5,7 +5,7 @@ import {
   tokenMatcher,
   CstNode,
 } from "chevrotain";
-import { MoonBitFunctionType, MoonBitType, MoonBitValue } from "./types";
+import { MoonBitEnum, MoonBitFunctionType, MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
 import { MoonBitError, MoonBitErrorType } from "./error";
 
@@ -28,6 +28,16 @@ const Minus = createToken({
 const NamedArgument = createToken({
   name: "NamedArgument",
   pattern: /~/,
+});
+
+const LBracket = createToken({
+  name: "LBracket",
+  pattern: /\[/,
+})
+
+const RBracket = createToken({
+  name: "RBracket",
+  pattern: /\]/,
 });
 
 const OptionalArgument = createToken({
@@ -102,6 +112,16 @@ const TypeName = createToken({
   pattern: /[A-Z][a-zA-Z0-9_]*/,
 });
 
+// const TraitName = createToken({
+//   name: "TraitName",
+//   pattern: /[A-Z][a-zA-Z0-9_]*/,
+// });
+
+// const EnumMember = createToken({
+//   name: "TraitName",
+//   pattern: /[A-Z][a-zA-Z0-9_]*/,
+// });
+
 const FunctionName = createToken({
   name: "FunctionName",
   pattern: /[a-z_][a-zA-Z0-9_]*/,
@@ -117,6 +137,22 @@ const While = createToken({
 const For = createToken({
   name: "For",
   pattern: /for/,
+});
+const Enum = createToken({
+  name: "Enum",
+  pattern: /enum/,
+});
+const Struct = createToken({
+  name: "Struct",
+  pattern: /struct/,
+});
+const Derive = createToken({
+  name: "Derive",
+  pattern: /derive/,
+});
+const Impl = createToken({
+  name: "Impl",
+  pattern: /impl/,
 });
 const Match = createToken({
   name: "Match",
@@ -231,6 +267,10 @@ const allTokens = [
   Mut,
   Pub,
   Fn,
+  Enum,
+  Struct,
+  Derive,
+  Impl,
   NamedArgument,
   OptionalArgument,
   Arrow,
@@ -241,6 +281,8 @@ const allTokens = [
   Match,
   LCurly,
   RCurly,
+  LBracket,
+  RBracket,
   Plus,
   Minus,
   Multi,
@@ -301,6 +343,36 @@ class MoonBitPure extends CstParser {
       $.SUBRULE2($.typeStatement, { LABEL: "type" });
     });
 
+    $.RULE("enumStatement", () => {
+      $.OPTION(() => $.CONSUME(Pub))
+      $.CONSUME(Enum);
+      $.CONSUME(TypeName, { LABEL: "name" });
+      $.CONSUME(LCurly);
+      $.MANY(() => {
+        $.CONSUME2(TypeName, { LABEL: "enumMember" });
+        $.MANY2(() => {
+          $.CONSUME(LParen);
+          $.MANY3(() => {
+            $.SUBRULE($.typeStatement, { LABEL: "enumType" });
+            $.OPTION2(() => $.CONSUME2(Comma));
+          });
+          $.CONSUME(RParen);
+        });
+      });
+      $.CONSUME(RCurly);
+
+      $.MANY4(() => {
+        $.CONSUME(Derive);
+        $.CONSUME2(LParen);
+        $.MANY5(() => {
+          $.CONSUME3(TypeName, { LABEL: "traitName" });
+          $.OPTION3(() => $.CONSUME3(Comma));
+        });
+        $.CONSUME2(RParen);
+      });
+
+    });
+
     $.RULE("fnStatement", () => {
       $.OPTION(() => $.CONSUME(Pub));
       $.CONSUME(Fn);
@@ -322,6 +394,7 @@ class MoonBitPure extends CstParser {
       $.OR([
         { ALT: () => $.SUBRULE($.fnStatement) },
         { ALT: () => $.SUBRULE($.letStatement) },
+        { ALT: () => $.SUBRULE($.enumStatement) },
         { ALT: () => $.SUBRULE($.ifStatement) },
         { ALT: () => $.SUBRULE($.whileStatement) },
         { ALT: () => $.SUBRULE($.forStatement) },
@@ -454,7 +527,19 @@ class MoonBitPure extends CstParser {
     $.RULE("typeStatement", () =>
       $.OR([
         { ALT: () => $.SUBRULE($.functionTypeStatement) },
-        { ALT: () => $.CONSUME(TypeName) },
+        {
+          ALT: () => $.MANY(() => {
+            $.CONSUME(TypeName);
+            $.MANY2(() => {
+              $.CONSUME(LBracket);
+              $.MANY3(() => {
+                $.SUBRULE2($.typeStatement, { LABEL: "genericType" });
+                $.OPTION2(() => $.CONSUME(Comma));
+              });
+              $.CONSUME(RBracket);
+            });
+          })
+        },
       ])
     );
 
@@ -505,6 +590,9 @@ class MoonBitPure extends CstParser {
     return notImplemented();
   }
   fnStatement(): CstNode {
+    return notImplemented();
+  }
+  enumStatement(): CstNode {
     return notImplemented();
   }
   argumentStatement(): CstNode {
@@ -622,6 +710,19 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (this.visit(condition)) {
       this.visit(body);
     }
+  }
+  enumStatement(ctx: any) {
+    console.log("enumStatement", ctx);
+    const enumName = this.visit(ctx.name); // Get enum name
+    const variants = ctx.variant.map((variantCtx: any) => this.visit(variantCtx)); // Get variants
+
+    // Create a new enum object
+    const enumObj = new MoonBitEnum(variants);
+
+    console.log("enumName", enumName);
+
+    // Assign the enum to the global scope
+    // return (this.scopes[0][enumName] = enumObj);
   }
 
   fnStatement(ctx: any) {
@@ -819,6 +920,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
       return this.visit(ctx.letStatement);
     } else if (ctx.ifStatement) {
       return this.visit(ctx.ifStatement);
+    } else if (ctx.enumStatement) {
+      return this.visit(ctx.enumStatement);
     } else if (ctx.matchStatement) {
       return this.visit(ctx.matchStatement);
     } else if (ctx.whileStatement) {
@@ -1169,7 +1272,7 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    // console.log("cst", cst);
+    console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
 
@@ -1279,6 +1382,19 @@ let strictMode = false;
 // vm.eval(`for i = 0; i < 10; i=i+1 {
 //   println(i) 
 // }`); // 输出 0 到 9
+
+
+const vm = new MoonBitVM();
+vm.eval(`pub enum Json {
+  Null
+  True
+  False
+  Number(Double)
+  String(String)
+  Array(Array[Json])
+  Object(Map[String, Json])
+} derive(Eq, ToJson, FromJson)`);
+
 
 
 export { MoonBitVM, strictMode };
