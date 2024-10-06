@@ -21,6 +21,7 @@ class MoonBitType {
   static Double = new MoonBitType("Double");
   static String = new MoonBitType("String");
   static Bool = new MoonBitType("Bool");
+  static Map = new MoonBitType("Map");
   static Char = new MoonBitType("Char");
   static Function = new MoonBitType("Function");
   static Self = new MoonBitType("Self");
@@ -29,7 +30,7 @@ class MoonBitType {
     this.name = name;
   }
 
-  static matchFromTypeName(strType: string) {
+  static matchFromTypeName(typeScopes: Record<string, MoonBitType>[], strType: string) {
     switch (strType) {
       case "Unit":
         return MoonBitType.Unit;
@@ -46,6 +47,12 @@ class MoonBitType {
       case "Self":
         return MoonBitType.Self;
       default:
+        for (let i = typeScopes.length - 1; i >= 0; i--) {
+          const typeScope = typeScopes[i];
+          if (typeScope[strType] !== undefined) {
+            return typeScope[strType];
+          }
+        }
         throw new Error(`Unknown type: ${strType}`);
     }
   }
@@ -133,6 +140,42 @@ class MoonBitTrait {
   }
 }
 
+interface MoonBitStructMemberTypeOptions {
+  isMutable: boolean;
+}
+
+class MoonBitStructMemberType extends MoonBitType {
+  name: string;
+  type: MoonBitType;
+  options: MoonBitStructMemberTypeOptions;
+
+  constructor(name: string, type: MoonBitType, options: MoonBitStructMemberTypeOptions) {
+    super(name);
+    this.name = name;
+    this.type = type;
+    this.options = options;
+  }
+
+  toString() {
+    return `${this.name}: ${this.type.toString()}`;
+  }
+}
+
+class MoonBitStruct extends MoonBitType {
+  members: MoonBitStructMemberType[];
+  derives: MoonBitTrait[];
+
+  constructor(name: string, members: MoonBitStructMemberType[], derives: MoonBitTrait[]) {
+    super(name);
+    this.members = members;
+    this.derives = derives;
+  }
+
+  toString() {
+    return `struct ${this.name} {\n  ${this.members.map((member) => member.toString()).join(",\n  ")}\n}`;
+  }
+}
+
 class MoonBitEnum extends MoonBitType {
   values: MoonBitType[];
   derives: MoonBitTrait[];
@@ -148,6 +191,39 @@ class MoonBitEnum extends MoonBitType {
   }
 }
 
-export { MoonBitType, MoonBitTrait, MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitValue };
+class MoonBitMap {
+  entries: MoonBitMapEntry[];
+
+  constructor(entries: MoonBitMapEntry[]) {
+    this.entries = entries;
+  }
+
+  get(key: MoonBitValue) {
+    return this.entries.find((value) => {
+      value.key == key
+    });
+  }
+
+  toString() {
+    return `{ ${this.entries.map((entry) => entry.toString()).join(", ")} }`;
+  }
+}
+
+class MoonBitMapEntry {
+  key: MoonBitValue;
+  value: MoonBitValue;
+
+  constructor(key: MoonBitValue, value: MoonBitValue) {
+    this.key = key;
+    this.value = value;
+  }
+
+  toString() {
+    return `${this.key.toString()}: ${this.value.toString()}`;
+  }
+}
+
+export { MoonBitType, MoonBitMapEntry, MoonBitMap, MoonBitStruct, MoonBitStructMemberType, MoonBitTrait, MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitValue };
+export type { MoonBitStructMemberTypeOptions };
 
 

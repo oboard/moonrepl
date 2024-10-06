@@ -5,7 +5,7 @@ import {
   tokenMatcher,
   CstNode,
 } from "chevrotain";
-import { MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitTrait, MoonBitType, MoonBitValue } from "./types";
+import { MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitMap, MoonBitMapEntry, MoonBitStruct, MoonBitStructMemberType, MoonBitTrait, MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
 import { MoonBitError, MoonBitErrorType } from "./error";
 
@@ -14,6 +14,10 @@ const AdditionOperator = createToken({
   name: "AdditionOperator",
   pattern: Lexer.NA,
 });
+const Comment = createToken({
+  name: "Comment",
+  pattern: /\s*\/\/.*/
+})
 const Plus = createToken({
   name: "Plus",
   pattern: /\+/,
@@ -263,10 +267,16 @@ const Pipeline = createToken({
 const LCurly = createToken({ name: "LCurly", pattern: /{/ });
 const RCurly = createToken({ name: "RCurly", pattern: /}/ });
 
+const Enter = createToken({
+  name: "Enter",
+  pattern: /\n/
+})
 const Semicolon = createToken({ name: "Semicolon", pattern: /;/ });
 
 const allTokens = [
   WhiteSpace,
+  Enter,
+  Comment,
   Semicolon,
   Let,
   Mut,
@@ -331,8 +341,12 @@ class MoonBitPure extends CstParser {
 
     $.RULE("row", () => {
       $.MANY(() => {
-        $.SUBRULE($.pipelineExpression);
-        $.OPTION(() => $.CONSUME(Semicolon));
+        $.OR([
+          { ALT: () => $.CONSUME(Comment) },
+          { ALT: () => $.SUBRULE($.pipelineExpression) }
+        ]);
+        $.OPTION(() => $.CONSUME(Enter));
+        $.OPTION2(() => $.CONSUME(Semicolon));
       });
     });
 
@@ -351,6 +365,11 @@ class MoonBitPure extends CstParser {
       $.OPTION2(() => $.CONSUME(OptionalArgument));
       $.CONSUME(Colon);
       $.SUBRULE2($.typeStatement, { LABEL: "type" });
+    });
+
+    $.RULE("visitStatement", () => {
+      $.SUBRULE($.functionName, { LABEL: "lhs" });
+      $.SUBRULE2($.functionName, { LABEL: "rhs" });
     });
 
     $.RULE("enumMember", () => {
@@ -430,9 +449,18 @@ class MoonBitPure extends CstParser {
       $.CONSUME(TypeName, { LABEL: "name" });
       $.CONSUME(LCurly);
       $.MANY(() => {
-        $.SUBRULE($.argumentStatement);
+        $.SUBRULE($.structMemberStatement);
         // $.OPTION2(() => $.CONSUME2(Comma));
       });
+      $.CONSUME(RCurly);
+      $.OPTION3(() => $.SUBRULE($.deriveStatement));
+    });
+
+    $.RULE("structMemberStatement", () => {
+      $.OPTION(() => $.CONSUME(Mut));
+      $.SUBRULE($.functionName, { LABEL: "name" });
+      $.CONSUME(Colon);
+      $.SUBRULE($.typeStatement, { LABEL: "type" });
     });
 
     $.RULE("fnStatement", () => {
@@ -464,6 +492,7 @@ class MoonBitPure extends CstParser {
         { ALT: () => $.SUBRULE($.whileStatement) },
         { ALT: () => $.SUBRULE($.forStatement) },
         { ALT: () => $.SUBRULE($.matchStatement) },
+        { ALT: () => $.SUBRULE($.mapStatement) },
         { ALT: () => $.SUBRULE($.assignmentStatement) },
         { ALT: () => $.SUBRULE($.comparisonExpression) },
       ]);
@@ -514,6 +543,21 @@ class MoonBitPure extends CstParser {
       $.OPTION(() => $.CONSUME(RCurly));
     });
 
+    $.RULE("mapEntryStatement", () => {
+      $.SUBRULE($.functionName, { LABEL: "key" });
+      $.CONSUME(Colon);
+      $.SUBRULE($.expression, { LABEL: "value" });
+    });
+
+    $.RULE("mapStatement", () => {
+      $.CONSUME(LCurly);
+      $.MANY(() => {
+        $.SUBRULE($.mapEntryStatement);
+        $.OPTION2(() => $.CONSUME(Comma));
+      })
+      $.CONSUME(RCurly);
+    });
+
     $.RULE("letStatement", () => {
       $.CONSUME(Let); // 可选的 "mut" 关键字
       $.OPTION(() => $.CONSUME(Mut)); // 可选的 "mut" 关键字
@@ -555,6 +599,7 @@ class MoonBitPure extends CstParser {
 
     $.RULE("atomicExpression", () =>
       $.OR([
+        { ALT: () => $.SUBRULE($.visitStatement) },
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
         { ALT: () => $.CONSUME(DoubleLiteral) },
         { ALT: () => $.CONSUME(IntegerLiteral) },
@@ -659,6 +704,15 @@ class MoonBitPure extends CstParser {
   enumStatement(): CstNode {
     return notImplemented();
   }
+  mapStatement(): CstNode {
+    return notImplemented();
+  }
+  mapEntryStatement(): CstNode {
+    return notImplemented();
+  }
+  visitStatement(): CstNode {
+    return notImplemented();
+  }
   enumMember(): CstNode {
     return notImplemented();
   }
@@ -672,6 +726,9 @@ class MoonBitPure extends CstParser {
     return notImplemented();
   }
   traitStatement(): CstNode {
+    return notImplemented();
+  }
+  structMemberStatement(): CstNode {
     return notImplemented();
   }
   structStatement(): CstNode {
@@ -743,7 +800,6 @@ const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 class MoonBitInterpreter extends BaseCstVisitor {
   scopes: Record<string, MoonBitValue>[] = [{}]; // Initialize with a global scope
   typeScopes: Record<string, MoonBitType>[] = [{}]; // Initialize with a global scope
-  traitScopes: Record<string, MoonBitTrait>[] = [{}]; // Initialize with a global scope
 
   constructor() {
     super();
@@ -792,6 +848,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const name = ctx.name[0].image; // Get trait name
     const members = ctx.traitMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     const extend = ctx.extends?.map((traitCtx: any) => this.visit(traitCtx)); // Get extends
+    // console.log("traitStatement", name, members, extend);
     // const 
     this.checkBlockStatementClose(ctx);
 
@@ -799,10 +856,32 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const trait = new MoonBitTrait(name, members, extend);
 
     // Store the trait in the traitScopes
-    this.traitScopes[0][name] = trait;
+    this.typeScopes[0][name] = trait;
   }
-  structStatement(ctx: any) {
+  structMemberStatement(ctx: any) {
+    // console.log("structMemberStatement", ctx);
+    const name = ctx.name[0].image; // Get struct name
+    const type = this.visit(ctx.type); // Get type
+    const options = {
+      isMutable: ctx.Mut !== undefined,
+    }
 
+    return new MoonBitStructMemberType(name, type, options);
+  }
+
+  structStatement(ctx: any) {
+    // console.log("structStatement", ctx);
+    const name = ctx.name[0].image; // Get struct name
+    const members = ctx.structMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
+    const derives = this.visit(ctx.deriveStatement); // Get derives
+
+    this.checkBlockStatementClose(ctx);
+
+    // Execute the body while the condition is true
+    const struct = new MoonBitStruct(name, members, derives);
+
+    // Store the struct in the typeScopes
+    this.typeScopes[0][name] = struct;
   }
 
   matchStatement(ctx: any) {
@@ -815,6 +894,27 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // Execute the body while the condition is true
     if (this.visit(condition)) {
       this.visit(body);
+    }
+  }
+  mapStatement(ctx: any) {
+    // console.log("mapStatement", ctx);
+    const entries = ctx.mapEntryStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
+    return new MoonBitMap(entries);
+  }
+  mapEntryStatement(ctx: any) {
+    // console.log("mapEntryStatement", ctx);
+    const key = this.visit(ctx.key); // Get key
+    const value = this.visit(ctx.value); // Get value
+
+    return new MoonBitMapEntry(key, value);
+  }
+  visitStatement(ctx: any) {
+    console.log("visitStatement", ctx);
+    const lhs: MoonBitValue = this.getVariable(this.visit(ctx));
+    const rhs: MoonBitValue = this.visit(ctx); // Get rhs
+
+    if (lhs instanceof MoonBitMap) {
+      return lhs.get(rhs)
     }
   }
   enumMember(ctx: any) {
@@ -841,7 +941,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   getTrait(traitName: string) {
     // Implement logic to retrieve the trait from the traitScopes
     // For simplicity, let's assume traits are stored in the global scope
-    return this.traitScopes[0][traitName];
+    return this.typeScopes[0][traitName];
   }
 
   enumStatement(ctx: any) {
@@ -849,6 +949,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const name = ctx.name[0].image; // Get enum name
     const values = ctx.enumMember.map((memberCtx: any) => this.visit(memberCtx)); // Get enum values
     const derives = ctx.deriveStatement?.map((deriveCtx: any) => this.visit(deriveCtx)); // Get derives
+
+    this.checkBlockStatementClose(ctx);
+
     // Assign the enum to the global scope
     // console.log(JSON.stringify(new MoonBitEnum(name, values, derives), null, 2))
     return (this.typeScopes[0][name] = new MoonBitEnum(name, values, derives));
@@ -1071,6 +1174,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
       return this.visit(ctx.forStatement);
     } else if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement);
+    } else if (ctx.mapStatement) {
+      return this.visit(ctx.mapStatement);
     } else if (ctx.blockStatement) {
       return this.visit(ctx.blockStatement);
     } else if (ctx.comparisonExpression) {
@@ -1182,6 +1287,8 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (ctx.functionName) {
       const varName = this.visit(ctx.functionName); // Get the variable name
       return this.getVariable(varName);
+    } else if (ctx.visitStatement) {
+      return this.visit(ctx.visitStatement);
     } else if (ctx.parenthesisExpression) {
       // passing an array to "this.visit" is equivalent
       // to passing the array's first element
@@ -1369,7 +1476,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (ctx.functionTypeStatement) {
       return this.visit(ctx.functionTypeStatement);
     }
-    return MoonBitType.matchFromTypeName(ctx.TypeName[0].image);
+    return MoonBitType.matchFromTypeName(this.typeScopes, ctx.TypeName[0].image);
   }
 }
 
@@ -1413,7 +1520,7 @@ class MoonBitVM {
     const lexResult = CalculatorLexer.tokenize(input);
     parser.input = lexResult.tokens;
     const cst = parser.row();
-    // console.log("cst", cst);
+    console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
 
@@ -1527,19 +1634,31 @@ let strictMode = false;
 
 const vm = new MoonBitVM();
 vm.eval(`
-pub trait Eq {
-  op_equal(Self, Self) -> Bool
+// pub trait Logger {
+// }
+// pub trait Eq {
+//   op_equal(Self, Self) -> Bool
+// }
+// pub trait Show {
+//   output(Self, Logger) -> Unit
+//   to_string(Self) -> String
+// }
+  
+struct Point {
+  x: Int
+  y: Int
 }
   
+// pub enum Json {
+//   Null
+//   True
+//   False
+//   Number(Double)
+//   String(String)
+// } derive(Eq)
 
-  
-pub enum Json {
-  Null
-  True
-  False
-  Number(Double)
-  String(String)
-} derive(Eq)
+let a: Point = { x: 1, y: 2 }
+println(a)
 `);
 
 
