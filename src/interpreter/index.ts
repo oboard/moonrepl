@@ -909,16 +909,17 @@ class MoonBitInterpreter extends BaseCstVisitor {
       ctx.rhs.forEach(
         (rhsOperand: CstNode | CstNode[], idx: string | number) => {
           // there will be one operator for each rhs operand
-          let rhsValue = this.visit(rhsOperand);
+          let rhs = this.visit(rhsOperand);
+          let rhsValue = rhs.value;
           let operator = ctx.MultiplicationOperator[idx];
 
-          MoonBitType.checkValueTypeWithError(rhsValue, result.type);
+          MoonBitType.checkValueTypeWithError(rhs, result.type);
 
           if (tokenMatcher(operator, Multi)) {
-            result *= rhsValue;
+            result = new MoonBitValue(result * rhsValue, result.type)
           } else {
             // Division
-            result /= rhsValue;
+            result = new MoonBitValue(result / rhsValue, result.type)
           }
         }
       );
@@ -1223,6 +1224,11 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");
 // console.log(vm.eval("add(1, 2)")); // 返回 3
+
+
+const vm = new MoonBitVM();
+vm.eval("fn double(x: Int) -> Int { x*2 }");
+console.log(vm.eval("double(2)")); // 返回 3
 
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int { a + b }");

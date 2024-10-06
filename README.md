@@ -15,7 +15,7 @@ Progress:
 - [x] Let Mut Statement
 - [x] Strict Mode
 - [x] Template String
-- [x] Basic Types
+- [x] Basic Types (Int, Double, String, Bool, Char)
 - [x] Function Types
 - [x] If Statement
 - [x] Types Check
