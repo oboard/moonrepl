@@ -310,9 +310,33 @@ class MoonBitPure extends CstParser {
         { ALT: () => $.SUBRULE($.fnStatement) },
         { ALT: () => $.SUBRULE($.letStatement) },
         { ALT: () => $.SUBRULE($.ifStatement) },
+        { ALT: () => $.SUBRULE($.whileStatement) },
+        { ALT: () => $.SUBRULE($.forStatement) },
+        { ALT: () => $.SUBRULE($.matchStatement) },
         { ALT: () => $.SUBRULE($.assignmentStatement) },
         { ALT: () => $.SUBRULE($.comparisonExpression) },
       ]);
+    });
+
+    // while
+    $.RULE("whileStatement", () => {
+      $.CONSUME(While);
+      $.SUBRULE($.expression, { LABEL: "condition" });
+      $.SUBRULE($.blockStatement, { LABEL: "body" });
+    });
+
+    // for
+    $.RULE("forStatement", () => {
+      $.CONSUME(For);
+      $.SUBRULE($.expression, { LABEL: "condition" });
+      $.SUBRULE($.blockStatement, { LABEL: "body" });
+    });
+
+    // match
+    $.RULE("matchStatement", () => {
+      $.CONSUME(Match);
+      $.SUBRULE($.expression, { LABEL: "condition" });
+      $.SUBRULE($.blockStatement, { LABEL: "body" });
     });
 
     $.RULE("comparisonExpression", () => {
@@ -453,6 +477,15 @@ class MoonBitPure extends CstParser {
     // derived during the self analysis phase.
     this.performSelfAnalysis();
   }
+  whileStatement(): CstNode {
+    return notImplemented();
+  }
+  forStatement(): CstNode {
+    return notImplemented();
+  }
+  matchStatement(): CstNode {
+    return notImplemented();
+  }
   fnStatement(): CstNode {
     return notImplemented();
   }
@@ -529,6 +562,46 @@ class MoonBitInterpreter extends BaseCstVisitor {
     super();
     // This helper will detect any missing or redundant methods on this visitor
     this.validateVisitor();
+  }
+
+  whileStatement(ctx: any) {
+    // console.log("whileStatement", JSON.stringify(ctx, null, 2));
+
+    const condition = ctx.condition; // Get condition
+    const body = ctx.body; // Get body
+
+    this.checkBlockStatementClose(body[0].children);
+
+    // Execute the body while the condition is true
+    while (this.visit(condition).value) {
+      this.visit(body);
+    }
+  }
+
+  forStatement(ctx: any) {
+    // console.log("forStatement", ctx);
+    const condition = this.visit(ctx.condition); // Get condition
+    const body = ctx.body; // Get body
+
+    this.checkBlockStatementClose(body[0].children);
+
+    // Execute the body while the condition is true
+    for (let i = 0; this.visit(condition); i++) {
+      this.visit(body);
+    }
+  }
+
+  matchStatement(ctx: any) {
+    // console.log("matchStatement", ctx);
+    const condition = this.visit(ctx.condition); // Get condition
+    const body = ctx.body; // Get body
+
+    this.checkBlockStatementClose(body[0].children);
+
+    // Execute the body while the condition is true
+    if (this.visit(condition)) {
+      this.visit(body);
+    }
   }
 
   fnStatement(ctx: any) {
@@ -621,6 +694,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     const value = this.visit(ctx.rhs); // Evaluate expression
     const scope = this.getVariableScope(varName) ?? this.scopes[0]; // Get the variable scope
 
+    // console.log("assignmentStatement", varName, value);
     // 检查变量是否 writable
     if (Object.getOwnPropertyDescriptor(scope, varName)?.writable === false) {
       throw new Error(`Variable ${varName} is not mutable.`);
@@ -725,6 +799,12 @@ class MoonBitInterpreter extends BaseCstVisitor {
       return this.visit(ctx.letStatement);
     } else if (ctx.ifStatement) {
       return this.visit(ctx.ifStatement);
+    } else if (ctx.matchStatement) {
+      return this.visit(ctx.matchStatement);
+    } else if (ctx.whileStatement) {
+      return this.visit(ctx.whileStatement);
+    } else if (ctx.forStatement) {
+      return this.visit(ctx.forStatement);
     } else if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement);
     } else if (ctx.blockStatement) {
@@ -750,10 +830,16 @@ class MoonBitInterpreter extends BaseCstVisitor {
           // console.log("rhsValue", rhsValue);
           MoonBitType.checkValueTypeWithError(rhsValue, result.type);
           if (tokenMatcher(operator, Plus)) {
-            result += rhsValue;
+            result = new MoonBitValue(
+              result.value + rhsValue.value,
+              result.type
+            );
           } else {
             // Minus
-            result -= rhsValue;
+            result = new MoonBitValue(
+              result.value - rhsValue.value,
+              result.type
+            );
           }
         }
       );
@@ -773,6 +859,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
         let rhsValue = rhs.value;
         let operator = ctx.ComparisonOperator[idx];
         let lhsValue = result.value;
+        // console.log("comparisonExpression", result, operator, rhs);
 
         MoonBitType.checkValueTypeWithError(rhs, result.type);
 
@@ -1015,7 +1102,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
 }
 
 class MoonBitVM {
-  private interpreter: MoonBitInterpreter;
+  interpreter: MoonBitInterpreter;
 
   constructor() {
     this.interpreter = new MoonBitInterpreter();
@@ -1057,13 +1144,8 @@ class MoonBitVM {
     // console.log("cst", cst);
     // console.log("lexResult", lexResult);
     const value = this.interpreter.visit(cst);
-    if (value) {
-      if (value.toString) {
-        return value.toString();
-      } else {
-        return value;
-      }
-    }
+
+    return value;
   }
 }
 
@@ -1146,8 +1228,14 @@ let strictMode = false;
 // const vm = new MoonBitVM();
 // vm.eval("if 1 < 2 {");
 
-
 // const vm = new MoonBitVM();
 // vm.eval("fn add(a: Int, b: Int) -> Int {");
+
+// const vm = new MoonBitVM();
+// vm.eval(`let mut a = 0
+// while a < 10 {
+//   a = a + 1
+//  println(a)
+// }`); // 输出 1 到 10
 
 export { MoonBitVM, strictMode };

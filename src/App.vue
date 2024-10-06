@@ -5,6 +5,8 @@ import { FitAddon } from '@xterm/addon-fit';
 import "@xterm/xterm/css/xterm.css";
 import { MoonBitVM } from './interpreter/index';
 import { MoonBitError, MoonBitErrorType } from './interpreter/error';
+import { MoonBitFunction } from './interpreter/function';
+import { MoonBitType, MoonBitValue } from './interpreter/types';
 
 const vm = new MoonBitVM();
 
@@ -59,6 +61,25 @@ onMounted(() => {
         term.loadAddon(fitAddon);
         term.open(terminalRef.value);
         handleResize();
+
+
+        // 添加内置函数
+        vm.interpreter.addFunction(
+            "println",
+            new MoonBitFunction(
+                [
+                    {
+                        type: MoonBitType.String,
+                        name: "arg",
+                    },
+                ],
+                MoonBitType.Unit,
+                (arg: MoonBitValue) => {
+                    term.writeln(`${arg.toString()}`);
+                    return new MoonBitValue(arg.toString(), MoonBitType.Unit);
+                }
+            )
+        );
 
         // 监听窗口大小变化
         window.addEventListener('resize', handleResize);
@@ -143,8 +164,8 @@ onMounted(() => {
                         console.log("inputBuffer", inputBuffer);
                         console.log("multilineBuffer", multilineBuffer)
                         const result = vm.eval(multilineBuffer); // 执行表达式
-                        if (result !== undefined) {
-                            term.writeln(`${result}`); // 显示输入内容
+                        if (result instanceof MoonBitValue && result.type !== MoonBitType.Unit) {
+                            term.writeln(`${result}`); // 显示结果
                         }
                         multilineBuffer = '';
                     } catch (e: unknown) {
