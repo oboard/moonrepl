@@ -46,10 +46,18 @@ deno run --allow-read --allow-write --unstable-sloppy-imports --allow-env
 - [x] Functions 函数
 - [x] While Statement While 循环
 - [x] For Statement For 循环
+- [ ] For Else 循环的Else
 - [x] Comment 注释
 - [x] Enum 枚举
 - [x] Struct 结构体
 - [x] Derive 派生
+- [x] Pipeline 管道运算符
 - [x] Trait 特征
-- [ ] Loop Statement Loop 循环
+- [ ] Trait Function 特征函数
+- [ ] Trait Type Check 特征类型检查
+- [ ] Trait Inheritance 特征继承
+- [ ] Trait Default Implementations 特征默认实现
+- [ ] Array 数组
+- [ ] Json 序列化
+- [ ] Match Statement 模式匹配
 - [ ] Match Statement 模式匹配
