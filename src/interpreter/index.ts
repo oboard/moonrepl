@@ -403,8 +403,8 @@ class MoonBitPure extends CstParser {
         $.SUBRULE($.enumMember);
         $.OPTION2(() => $.CONSUME2(Comma));
       });
-      $.CONSUME(RCurly);
-      $.OPTION3(() => $.SUBRULE($.deriveStatement));
+      $.OPTION3(() => $.CONSUME(RCurly));
+      $.OPTION4(() => $.SUBRULE($.deriveStatement));
     });
 
     $.RULE("traitStatement", () => {
@@ -420,8 +420,8 @@ class MoonBitPure extends CstParser {
         $.SUBRULE($.traitMemberStatement);
         $.OPTION2(() => $.CONSUME2(Comma));
       });
-      $.CONSUME(RCurly);
-      $.OPTION3(() => $.SUBRULE($.deriveStatement));
+      $.OPTION3(() => $.CONSUME(RCurly));
+      $.OPTION4(() => $.SUBRULE($.deriveStatement));
     });
 
     // op_equal(Self, Self) -> Bool
@@ -450,10 +450,9 @@ class MoonBitPure extends CstParser {
       $.CONSUME(LCurly);
       $.MANY(() => {
         $.SUBRULE($.structMemberStatement);
-        // $.OPTION2(() => $.CONSUME2(Comma));
       });
-      $.CONSUME(RCurly);
-      $.OPTION3(() => $.SUBRULE($.deriveStatement));
+      $.OPTION(() => $.CONSUME(RCurly));
+      $.OPTION2(() => $.SUBRULE($.deriveStatement));
     });
 
     $.RULE("structMemberStatement", () => {
@@ -555,7 +554,7 @@ class MoonBitPure extends CstParser {
         $.SUBRULE($.mapEntryStatement);
         $.OPTION2(() => $.CONSUME(Comma));
       })
-      $.CONSUME(RCurly);
+      $.OPTION(() => $.CONSUME(RCurly));
     });
 
     $.RULE("letStatement", () => {
@@ -870,7 +869,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   structStatement(ctx: any) {
-    // console.log("structStatement", ctx);
+    console.log("structStatement", ctx);
     const name = ctx.name[0].image; // Get struct name
     const members = ctx.structMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     const derives = this.visit(ctx.deriveStatement); // Get derives
@@ -1631,35 +1630,39 @@ let strictMode = false;
 // }`); // 输出 0 到 9
 
 
-const vm = new MoonBitVM();
-vm.eval(`
-// pub trait Logger {
-// }
-// pub trait Eq {
-//   op_equal(Self, Self) -> Bool
-// }
-// pub trait Show {
-//   output(Self, Logger) -> Unit
-//   to_string(Self) -> String
+// const vm = new MoonBitVM();
+// vm.eval(`
+// // pub trait Logger {
+// // }
+// // pub trait Eq {
+// //   op_equal(Self, Self) -> Bool
+// // }
+// // pub trait Show {
+// //   output(Self, Logger) -> Unit
+// //   to_string(Self) -> String
+// // }
+  
+// struct Point {
+//   x: Int
+//   y: Int
 // }
   
-struct Point {
-  x: Int
-  y: Int
-}
-  
-// pub enum Json {
-//   Null
-//   True
-//   False
-//   Number(Double)
-//   String(String)
-// } derive(Eq)
+// // pub enum Json {
+// //   Null
+// //   True
+// //   False
+// //   Number(Double)
+// //   String(String)
+// // } derive(Eq)
 
-let a: Point = { x: 1, y: 2 }
-println(a)
-`);
+// let a: Point = { x: 1, y: 2 }
+// println(a)
+// `);
 
+// const vm = new MoonBitVM();
+// vm.eval(`
+//   struct Point {
+// `); // error: missing `}`
 
 
 export { MoonBitVM, strictMode };
