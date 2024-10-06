@@ -4,11 +4,9 @@ MoonBit Interpreter (Unofficial)
 
 MoonRepl is an interpreter for the MoonBit programming language. It is an unofficial implementation of the MoonBit programming language. It is written in TypeScript.
 
-![MoonRepl Preview Image](screenshots/1.png)
-
 ## Try
 
-### Online
+### Online (Recommanded)
 https://moonrepl.oboard.eu.org/
 
 ### Local
@@ -18,17 +16,16 @@ git clone https://github.com/oboard/moonrepl.git
 ```
 2. Install dependencies
 ```bash
-npm install
-yarn install
-pnpm install
-bun install
+bun install # or npm install or yarn install or pnpm install
 ```
 3. Start the program
 #### Run .ts file with Deno or Bun.js
 ```bash
+bun entry.ts # Recommended
 deno run --allow-read --allow-write --unstable-sloppy-imports --allow-env
-bun entry.ts
 ```
+
+![MoonRepl Preview Image](screenshots/1.png)
 
 ## Features
 
