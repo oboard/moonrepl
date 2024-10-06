@@ -146,6 +146,30 @@ const Struct = createToken({
   name: "Struct",
   pattern: /struct/,
 });
+const Trait = createToken({
+  name: "Trait",
+  pattern: /trait/,
+});
+const Type = createToken({
+  name: "Type",
+  pattern: /type/,
+});
+const With = createToken({
+  name: "With",
+  pattern: /with/,
+});
+const Test = createToken({
+  name: "Test",
+  pattern: /test/,
+});
+const Dot = createToken({
+  name: "Dot",
+  pattern: /\./,
+});
+const Path = createToken({
+  name: "Path",
+  pattern: /::/,
+});
 const Derive = createToken({
   name: "Derive",
   pattern: /derive/,
@@ -288,6 +312,11 @@ const allTokens = [
   Multi,
   Div,
   Pipeline,
+  Test,
+  Type,
+  With,
+  Trait,
+  Dot,
   Colon,
   GreaterThanOrEqual,
   LessThanOrEqual,
@@ -376,6 +405,36 @@ class MoonBitPure extends CstParser {
       });
       $.CONSUME(RCurly);
       $.OPTION3(() => $.SUBRULE($.deriveStatement));
+    });
+
+    $.RULE("traitStatement", () => {
+      $.OPTION(() => $.CONSUME(Pub));
+      $.CONSUME(Trait);
+      $.CONSUME(TypeName, { LABEL: "name" });
+      $.CONSUME(LCurly);
+      $.MANY(() => {
+        $.SUBRULE($.traitStatement);
+        $.OPTION2(() => $.CONSUME2(Comma));
+      });
+      $.CONSUME(RCurly);
+      $.OPTION3(() => $.SUBRULE($.deriveStatement));
+    });
+
+    $.RULE("testStatement", () => {
+      $.CONSUME(Test);
+      $.OPTION(() => $.CONSUME(StringLiteral));
+      $.SUBRULE($.blockStatement);
+    });
+
+
+    $.RULE("structStatement", () => {
+      $.CONSUME(Struct);
+      $.CONSUME(TypeName, { LABEL: "name" });
+      $.CONSUME(LCurly);
+      $.MANY(() => {
+        $.SUBRULE($.argumentStatement);
+        // $.OPTION2(() => $.CONSUME2(Comma));
+      });
     });
 
     $.RULE("fnStatement", () => {
@@ -611,6 +670,15 @@ class MoonBitPure extends CstParser {
   typeStatement(): CstNode {
     return notImplemented();
   }
+  traitStatement(): CstNode {
+    return notImplemented();
+  }
+  structStatement(): CstNode {
+    return notImplemented();
+  }
+  testStatement(): CstNode {
+    return notImplemented();
+  }
   functionTypeStatement(): CstNode {
     return notImplemented();
   }
@@ -671,6 +739,7 @@ const BaseCstVisitor = parser.getBaseCstVisitorConstructor();
 class MoonBitInterpreter extends BaseCstVisitor {
   scopes: Record<string, MoonBitValue>[] = [{}]; // Initialize with a global scope
   typeScopes: Record<string, MoonBitType>[] = [{}]; // Initialize with a global scope
+  traitScopes: Record<string, MoonBitTrait>[] = [{}]; // Initialize with a global scope
 
   constructor() {
     super();
@@ -727,19 +796,33 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   deriveStatement(ctx: any) {
-    const traits = ctx.trait.map((traitCtx: any) => this.visit(traitCtx)); // Get traits
+    console.log("deriveStatement", ctx);
+    const traitNames = ctx.traitName.map((traitCtx: any) => traitCtx.image); // Get traits
 
-
+    const traits = traitNames.map((traitName: string) => {
+      const trait = this.getTrait(traitName);
+      if (!trait) {
+        throw new Error(`Trait ${traitName} not found.`);
+      }
+      return trait;
+    });
+    return traits;
   }
 
+  getTrait(traitName: string) {
+    // Implement logic to retrieve the trait from the traitScopes
+    // For simplicity, let's assume traits are stored in the global scope
+    return this.traitScopes[0][traitName];
+  }
 
   enumStatement(ctx: any) {
     // console.log("enumStatement", ctx);
     const name = ctx.name[0].image; // Get enum name
     const values = ctx.enumMember.map((memberCtx: any) => this.visit(memberCtx)); // Get enum values
+    const derives = ctx.deriveStatement?.map((deriveCtx: any) => this.visit(deriveCtx)); // Get derives
     // Assign the enum to the global scope
-    console.log(JSON.stringify(new MoonBitEnum(values), null, 2))
-    return (this.typeScopes[0][name] = new MoonBitEnum(name, values));
+    console.log(JSON.stringify(new MoonBitEnum(name, values, derives), null, 2))
+    return (this.typeScopes[0][name] = new MoonBitEnum(name, values, derives));
   }
 
   fnStatement(ctx: any) {
