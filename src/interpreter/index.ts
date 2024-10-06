@@ -808,12 +808,12 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
   whileStatement(ctx: any) {
     // console.log("whileStatement", JSON.stringify(ctx, null, 2));
-
-    const condition = ctx.condition; // Get condition
     const body = ctx.body; // Get body
 
     this.checkBlockStatementClose(body[0].children);
 
+    const condition = ctx.condition; // Get condition
+  
     // Execute the body while the condition is true
     while (this.visit(condition).value) {
       this.visit(body);
@@ -821,13 +821,14 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   forStatement(ctx: any) {
+    const body = ctx.body; // Get body
+
+    this.checkBlockStatementClose(body[0].children);
+
     console.log("forStatement", ctx);
     const initialization = ctx.initialization; // Get initialization
     const condition = ctx.condition; // Get condition
     const iteration = ctx.iteration; // Get iteration
-    const body = ctx.body; // Get body
-
-    this.checkBlockStatementClose(body[0].children);
 
     // Execute the body while the condition is true
     for (this.visit(initialization); this.visit(condition).value; this.visit(iteration)) {
@@ -843,13 +844,13 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   traitStatement(ctx: any) {
+    this.checkBlockStatementClose(ctx);
     // console.log("traitStatement", ctx);
     const name = ctx.name[0].image; // Get trait name
     const members = ctx.traitMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     const extend = ctx.extends?.map((traitCtx: any) => this.visit(traitCtx)); // Get extends
     // console.log("traitStatement", name, members, extend);
     // const 
-    this.checkBlockStatementClose(ctx);
 
     // Execute the body while the condition is true
     const trait = new MoonBitTrait(name, members, extend);
@@ -869,12 +870,12 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   structStatement(ctx: any) {
+    this.checkBlockStatementClose(ctx);
     console.log("structStatement", ctx);
     const name = ctx.name[0].image; // Get struct name
     const members = ctx.structMemberStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     const derives = this.visit(ctx.deriveStatement); // Get derives
 
-    this.checkBlockStatementClose(ctx);
 
     // Execute the body while the condition is true
     const struct = new MoonBitStruct(name, members, derives);
@@ -884,11 +885,11 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   matchStatement(ctx: any) {
+    const body = ctx.body; // Get body
+    this.checkBlockStatementClose(body[0].children);
     // console.log("matchStatement", ctx);
     const condition = this.visit(ctx.condition); // Get condition
-    const body = ctx.body; // Get body
 
-    this.checkBlockStatementClose(body[0].children);
 
     // Execute the body while the condition is true
     if (this.visit(condition)) {
@@ -897,6 +898,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
   mapStatement(ctx: any) {
     // console.log("mapStatement", ctx);
+    this.checkBlockStatementClose(ctx);
     const entries = ctx.mapEntryStatement?.map((memberCtx: any) => this.visit(memberCtx)); // Get members
     return new MoonBitMap(entries);
   }
@@ -1641,12 +1643,12 @@ let strictMode = false;
 // //   output(Self, Logger) -> Unit
 // //   to_string(Self) -> String
 // // }
-  
+
 // struct Point {
 //   x: Int
 //   y: Int
 // }
-  
+
 // // pub enum Json {
 // //   Null
 // //   True
