@@ -41,8 +41,6 @@ rl.on('line', (input) => {
         } else {
             evaluateExpression(input); // 计算输入的表达式
         }
-        rl.setPrompt('> ');
-        rl.prompt(); // 再次显示提示符
     } catch (e: unknown) {
         if (e instanceof MoonBitError) {
             if (e.type === MoonBitErrorType.MissingRCurly) {
@@ -50,9 +48,27 @@ rl.on('line', (input) => {
                 rl.prompt();
                 return;
             }
-        } else {
-            console.error(`Error: ${e}`);
         }
+        console.error(`${e}`);
+    }
+    rl.setPrompt('> ');
+    rl.prompt(); // 再次显示提示符
+});
+
+let confirmClose = false;
+
+// 处理 ctrl-c 事件
+rl.on('SIGINT', () => {
+    if (confirmClose) {
+        console.log('Exiting MoonREPL');
+        process.exit(0);
+    } else {
+        console.log('Press Ctrl-C again to exit');
+        confirmClose = true;
+        setTimeout(() => {
+            confirmClose = false;
+        }, 5000);
+        rl.prompt();
     }
 });
 

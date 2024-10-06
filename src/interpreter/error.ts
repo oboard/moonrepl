@@ -2,6 +2,7 @@ enum MoonBitErrorType {
   MissingRCurly,
   TypeMismatch,
   TraitNotFound,
+  MissingReturnType,
 }
 
 class MoonBitError extends Error {

@@ -476,14 +476,17 @@ class MoonBitPure extends CstParser {
 
       $.OPTION2(() => $.SUBRULE2($.functionName));
 
-      $.CONSUME(LParen);
+      $.OPTION3(() => $.CONSUME(LParen));
       $.MANY2(() => [
         $.SUBRULE2($.argumentStatement),
-        $.OPTION3(() => $.CONSUME(Comma)),
+        $.OPTION4(() => $.CONSUME(Comma)),
       ]);
-      $.CONSUME(RParen);
-      $.CONSUME(Arrow);
-      $.SUBRULE($.typeStatement), $.SUBRULE($.blockStatement);
+      $.OPTION5(() => $.CONSUME(RParen));
+      $.MANY3(() => {
+        $.CONSUME(Arrow);
+        $.SUBRULE($.typeStatement);
+      });
+      $.SUBRULE($.blockStatement);
     });
 
     // 这里修改之后，expression函数中的判断也要同步修改
@@ -821,7 +824,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
     this.checkBlockStatementClose(body[0].children);
 
     const condition = ctx.condition; // Get condition
-  
+
     // Execute the body while the condition is true
     while (this.visit(condition).value) {
       this.visit(body);
@@ -972,7 +975,10 @@ class MoonBitInterpreter extends BaseCstVisitor {
       ctx.argumentStatement?.map((argCtx: any) => this.visit(argCtx)) ?? []; // Get arguments
     const returnType = this.visit(ctx.typeStatement); // Get return type
     const block = ctx.blockStatement; // Get function block
-
+    // console.log("fnStatement", functionName, args, returnType, block);
+    if (returnType === undefined) {
+      throw new MoonBitError(ctx, "Missing return type.", MoonBitErrorType.MissingReturnType);
+    }
     this.checkBlockStatementClose(block[0].children);
 
     // console.log("functionName", functionName);

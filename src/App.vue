@@ -248,7 +248,7 @@ onMounted(() => {
                     // 插入字符到当前光标位置
                     inputBuffer =
                         inputBuffer.slice(0, cursorPosition) + key + inputBuffer.slice(cursorPosition);
-                    cursorPosition++; // 光标位置向右移动一位
+                    cursorPosition += key.length; // 光标位置向右移动一位
                     term.write(key); // 显示输入内容
                     // refreshLine(); // 刷新行
                     break;
