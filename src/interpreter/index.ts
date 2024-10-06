@@ -3,7 +3,7 @@ import {
   Lexer,
   CstParser,
   tokenMatcher,
-  CstNode,
+  type CstNode,
 } from "chevrotain";
 import { MoonBitEnum, MoonBitEnumMemberType, MoonBitFunctionType, MoonBitMap, MoonBitMapEntry, MoonBitStruct, MoonBitStructMemberType, MoonBitTrait, MoonBitType, MoonBitValue } from "./types";
 import { MoonBitArgument, MoonBitFunction } from "./function";
@@ -345,6 +345,7 @@ class MoonBitPure extends CstParser {
   constructor() {
     super(allTokens);
 
+    // biome-ignore lint/complexity/noUselessThisAlias: <explanation>
     const $ = this;
 
     $.RULE("row", () => {
@@ -574,8 +575,8 @@ class MoonBitPure extends CstParser {
       $.SUBRULE($.functionName, { LABEL: "lhs" });
       $.OPTION2(() =>
         $.MANY(() => [$.CONSUME(Colon), $.SUBRULE2($.typeStatement)])
-      ),
-        $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
+      );
+      $.CONSUME(Equal); // 你需要定义一个 Equal Token (用于 "=")
       $.SUBRULE($.expression, { LABEL: "rhs" }); // 解析表达式并将其赋给变量
     });
 
@@ -965,7 +966,9 @@ class MoonBitInterpreter extends BaseCstVisitor {
 
     // Assign the enum to the global scope
     // console.log(JSON.stringify(new MoonBitEnum(name, values, derives), null, 2))
-    return (this.typeScopes[0][name] = new MoonBitEnum(name, values, derives));
+    const enums = new MoonBitEnum(name, values, derives)
+    this.typeScopes[0][name] = enums
+    return enums;
   }
 
   fnStatement(ctx: any) {
@@ -1035,29 +1038,28 @@ class MoonBitInterpreter extends BaseCstVisitor {
     if (condition) {
       // If the condition is true, evaluate the 'then' block
       return this.visit(ctx.blockStatement);
-    } else {
-      // Check for else if or else
-      // ctx.ifStatement?.forEach((elseIfCtx: any) => {
-      if (ctx.elseifStatement) {
-        for (let i = 0; i < ctx.elseifStatement.length; i++) {
-          const elseIfCtx = ctx.elseifStatement[i].children;
-          // console.log("elseIfCtx", elseIfCtx);
-          const elseIfCondition = this.visit(elseIfCtx.comparisonExpression); // Evaluate else if condition
-          if (elseIfCondition) {
-            // If else if condition is true, evaluate the 'else if' block
-            return this.visit(elseIfCtx.blockStatement);
-          }
-          if (elseIfCtx.elseStatement) {
-            return this.visit(elseIfCtx.elseStatement);
-          }
+    }
+    // Check for else if or else
+    // ctx.ifStatement?.forEach((elseIfCtx: any) => {
+    if (ctx.elseifStatement) {
+      for (let i = 0; i < ctx.elseifStatement.length; i++) {
+        const elseIfCtx = ctx.elseifStatement[i].children;
+        // console.log("elseIfCtx", elseIfCtx);
+        const elseIfCondition = this.visit(elseIfCtx.comparisonExpression); // Evaluate else if condition
+        if (elseIfCondition) {
+          // If else if condition is true, evaluate the 'else if' block
+          return this.visit(elseIfCtx.blockStatement);
+        }
+        if (elseIfCtx.elseStatement) {
+          return this.visit(elseIfCtx.elseStatement);
         }
       }
+    }
 
-      // Finally, check for else block if exists
-      if (ctx.elseStatement) {
-        // console.log("elseCtx", elseCtx);
-        return this.visit(ctx.elseStatement[0]);
-      }
+    // Finally, check for else block if exists
+    if (ctx.elseStatement) {
+      // console.log("elseCtx", elseCtx);
+      return this.visit(ctx.elseStatement[0]);
     }
   }
 
@@ -1168,31 +1170,31 @@ class MoonBitInterpreter extends BaseCstVisitor {
     // console.log("expression", ctx);
     if (ctx.fnStatement) {
       return this.visit(ctx.fnStatement);
-    } else if (ctx.letStatement) {
+    } if (ctx.letStatement) {
       return this.visit(ctx.letStatement);
-    } else if (ctx.traitStatement) {
+    } if (ctx.traitStatement) {
       return this.visit(ctx.traitStatement);
-    } else if (ctx.testStatement) {
+    } if (ctx.testStatement) {
       return this.visit(ctx.testStatement);
-    } else if (ctx.structStatement) {
+    } if (ctx.structStatement) {
       return this.visit(ctx.structStatement);
-    } else if (ctx.ifStatement) {
+    } if (ctx.ifStatement) {
       return this.visit(ctx.ifStatement);
-    } else if (ctx.enumStatement) {
+    } if (ctx.enumStatement) {
       return this.visit(ctx.enumStatement);
-    } else if (ctx.matchStatement) {
+    } if (ctx.matchStatement) {
       return this.visit(ctx.matchStatement);
-    } else if (ctx.whileStatement) {
+    } if (ctx.whileStatement) {
       return this.visit(ctx.whileStatement);
-    } else if (ctx.forStatement) {
+    } if (ctx.forStatement) {
       return this.visit(ctx.forStatement);
-    } else if (ctx.assignmentStatement) {
+    } if (ctx.assignmentStatement) {
       return this.visit(ctx.assignmentStatement);
-    } else if (ctx.mapStatement) {
+    } if (ctx.mapStatement) {
       return this.visit(ctx.mapStatement);
-    } else if (ctx.blockStatement) {
+    } if (ctx.blockStatement) {
       return this.visit(ctx.blockStatement);
-    } else if (ctx.comparisonExpression) {
+    } if (ctx.comparisonExpression) {
       return this.visit(ctx.comparisonExpression);
     }
   }
@@ -1377,7 +1379,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
           // console.log("func", func);
           result = func.value(result); // Call the function with the result
         } else {
-          throw new Error(`Unsupported expression after the pipe operator`);
+          throw new MoonBitError(ctx, "Unsupported expression after the pipe operator", MoonBitErrorType.UnsupportedExpressionAfterPipeOperator);
         }
       }
     }
@@ -1448,20 +1450,19 @@ class MoonBitInterpreter extends BaseCstVisitor {
           }
         );
         // throw new Error(`Expected ${func.args.length} arguments, got ${args.length}`);
-      } else if (args.length > func.args.length) {
+      } if (args.length > func.args.length) {
         throw new Error(
           `Expected ${func.args.length} arguments, got ${args.length}`
         );
       }
       func.args.forEach((arg: any, idx: number) => {
         if (arg.type !== args[idx].type) {
-          throw new Error(`Argument ${idx} is not ${arg.type}`);
+          throw new MoonBitError(arg, `Argument ${idx} is not ${arg.type}`, MoonBitErrorType.InvalidArgumentType);
         }
       });
       return func.value(...args); // Call the function with evaluated arguments
-    } else {
-      throw new Error(`Function ${name} is not defined.`);
     }
+    throw new Error(`Function ${name} is not defined.`);
   }
 
   // Example of adding a new function

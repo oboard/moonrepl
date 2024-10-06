@@ -1,8 +1,10 @@
 enum MoonBitErrorType {
-  MissingRCurly,
-  TypeMismatch,
-  TraitNotFound,
-  MissingReturnType,
+  MissingRCurly = 0,
+  TypeMismatch = 1,
+  TraitNotFound = 2,
+  MissingReturnType = 3,
+  UnsupportedExpressionAfterPipeOperator = 4,
+  InvalidArgumentType = 5,
 }
 
 class MoonBitError extends Error {

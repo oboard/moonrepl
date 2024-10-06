@@ -21,11 +21,21 @@ const RED = "\x1b[31m";
 // const CYAN = "\x1b[36m";
 // const WHITE = "\x1b[37m";
 
+// Function to check if a character is CJK (2-column wide in terminals)
+const isWideChar = (char: string) => {
+    const code = char.charCodeAt(0);
+    return (code >= 0x1100 && code <= 0x115F) || // Hangul Jamo
+        (code >= 0x2E80 && code <= 0xA4CF) || // CJK Radicals Supplement to Yi Radicals
+        (code >= 0xAC00 && code <= 0xD7A3) || // Hangul Syllables
+        (code >= 0xF900 && code <= 0xFAFF) || // CJK Compatibility Ideographs
+        (code >= 0xFE30 && code <= 0xFE4F) || // CJK Compatibility Forms
+        (code >= 0xFF00 && code <= 0xFFEF);   // Halfwidth and Fullwidth Forms
+};
 
 
 // Create a ref for the terminal element
 const terminalRef = ref<HTMLElement | null>(null);
-let term: Terminal = new Terminal({
+const term: Terminal = new Terminal({
     theme: {
         foreground: '#dcdcdc', // 字体颜色（浅灰色）
         background: '#2e3440', // 背景颜色（深灰蓝色）
@@ -93,7 +103,7 @@ onMounted(() => {
 
         let inputBuffer = ''; // 存储用户输入
         let multilineBuffer = ''; // 存储多行输入
-        let history: string[] = []; // 历史记录
+        const history: string[] = []; // 历史记录
         let historyIndex = -1; // 当前历史记录索引
         let cursorPosition = 0; // 光标位置
 
@@ -130,7 +140,7 @@ onMounted(() => {
             // console.log("event", event)
             if (event.key === 'Enter' && event.shiftKey && event.type === "keydown") {
                 term.write('\r\n'); // 换行
-                multilineBuffer += '\n' + inputBuffer;
+                multilineBuffer += `\n${inputBuffer}`;
                 multilinePrompt()
                 return false; // Prevent further processing of this Enter key
             }
@@ -159,7 +169,7 @@ onMounted(() => {
                         break;
                     }
                     if (multilineBuffer.length > 0) {
-                        multilineBuffer += '\n' + inputBuffer;
+                        multilineBuffer += `\n${inputBuffer}`;
                     } else {
                         multilineBuffer = inputBuffer;
                     }
@@ -191,12 +201,20 @@ onMounted(() => {
                     cursorPosition = 0; // 重置光标位置
                     writePrompt(); // 重新显示提示符
                     break;
-                case '\x7f': // 退格键
+                case '\x7f': // Backspace key
                     if (cursorPosition > 0 && inputBuffer.length > 0) {
+                        const charToDelete = inputBuffer[cursorPosition - 1];
                         inputBuffer =
                             inputBuffer.slice(0, cursorPosition - 1) + inputBuffer.slice(cursorPosition);
-                        cursorPosition--; // 光标向左移动一位
-                        refreshLine(); // 刷新当前行
+                        cursorPosition--; // Move cursor left
+
+                        if (isWideChar(charToDelete)) {
+                            term.write('\x1b[D\x1b[D'); // Move cursor 2 positions left for wide chars
+                        } else {
+                            term.write('\x1b[D'); // Move cursor 1 position left for regular chars
+                        }
+
+                        refreshLine(); // Refresh the current line to reflect the updated input
                     }
                     break;
                 case '\x03': // Ctrl + C
@@ -205,17 +223,29 @@ onMounted(() => {
                     cursorPosition = 0; // 重置光标位置
                     writePrompt(); // 重新显示提示符
                     break;
-                case '\u001b[D': // 左箭头键
+
+                // Assuming inputBuffer is an array of characters (string[]).
+                case '\u001b[D': // Left arrow key
                     if (cursorPosition > 0) {
+                        const prevChar = inputBuffer[cursorPosition - 1];
                         cursorPosition--;
-                        term.write('\x1b[D'); // 光标向左移动
+                        if (isWideChar(prevChar)) {
+                            term.write('\x1b[D\x1b[D'); // Move cursor 2 positions left for wide chars
+                        } else {
+                            term.write('\x1b[D'); // Move cursor 1 position left for regular chars
+                        }
                     }
                     break;
 
-                case '\u001b[C': // 右箭头键
+                case '\u001b[C': // Right arrow key
                     if (cursorPosition < inputBuffer.length) {
+                        const nextChar = inputBuffer[cursorPosition];
                         cursorPosition++;
-                        term.write('\x1b[C'); // 光标向右移动
+                        if (isWideChar(nextChar)) {
+                            term.write('\x1b[C\x1b[C'); // Move cursor 2 positions right for wide chars
+                        } else {
+                            term.write('\x1b[C'); // Move cursor 1 position right for regular chars
+                        }
                     }
                     break;
 
@@ -225,7 +255,7 @@ onMounted(() => {
                         inputBuffer = history[historyIndex];
                         cursorPosition = inputBuffer.length; // 将光标移到行尾
                         refreshLine();
-                    } else if (historyIndex == history.length) {
+                    } else if (historyIndex === history.length) {
                         // 当处于最底端时清空输入框
                         historyIndex++;
                         inputBuffer = '';

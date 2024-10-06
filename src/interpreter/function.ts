@@ -22,7 +22,7 @@ class MoonBitFunction extends MoonBitValue {
 }
 
 class MoonBitArgument {
-  name: string = "";
+  name: string;
   type: MoonBitType = MoonBitType.String;
 
   constructor(name: string, type: MoonBitType) {

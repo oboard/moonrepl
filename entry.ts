@@ -37,7 +37,7 @@ rl.prompt();
 // 处理用户每次输入的数据
 rl.on('line', (input) => {
     try {
-        accumulatedInput += input + '\n'; // 将用户输入追加到累积的表达式中
+        accumulatedInput += `${input}\n`; // 将用户输入追加到累积的表达式中
         if (input.trim() === 'exit') {
             rl.close(); // 输入 'exit' 时退出 REPL
         } else {
