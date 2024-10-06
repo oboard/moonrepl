@@ -161,8 +161,8 @@ onMounted(() => {
                         multilineBuffer = inputBuffer;
                     }
                     try {
-                        console.log("inputBuffer", inputBuffer);
-                        console.log("multilineBuffer", multilineBuffer)
+                        // console.log("inputBuffer", inputBuffer);
+                        // console.log("multilineBuffer", multilineBuffer)
                         const result = vm.eval(multilineBuffer); // 执行表达式
                         if (result instanceof MoonBitValue && result.type !== MoonBitType.Unit) {
                             term.writeln(`${result}`); // 显示结果

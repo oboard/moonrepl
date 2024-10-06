@@ -45,6 +45,11 @@ const MultiplicationOperator = createToken({
   pattern: Lexer.NA,
 });
 
+const Pub = createToken({
+  name: "Pub",
+  pattern: /pub/,
+});
+
 const Fn = createToken({
   name: "Function",
   pattern: /fn/,
@@ -76,6 +81,11 @@ const StringLiteral = createToken({
 const IntegerLiteral = createToken({
   name: "IntegerLiteral",
   pattern: /\d+/,
+});
+
+const DoubleLiteral = createToken({
+  name: "DoubleLiteral",
+  pattern: /\d+\.\d+/,
 });
 
 // const EscapeSequence = createToken({
@@ -219,6 +229,7 @@ const allTokens = [
   Semicolon,
   Let,
   Mut,
+  Pub,
   Fn,
   NamedArgument,
   OptionalArgument,
@@ -245,6 +256,7 @@ const allTokens = [
   Equal,
   LParen,
   RParen,
+  DoubleLiteral,
   IntegerLiteral,
   StringLiteral,
   ComparisonOperator,
@@ -290,9 +302,10 @@ class MoonBitPure extends CstParser {
     });
 
     $.RULE("fnStatement", () => {
+      $.OPTION(() => $.CONSUME(Pub));
       $.CONSUME(Fn);
 
-      $.OPTION(() => $.SUBRULE2($.functionName));
+      $.OPTION2(() => $.SUBRULE2($.functionName));
 
       $.CONSUME(LParen);
       $.MANY2(() => [
@@ -401,8 +414,9 @@ class MoonBitPure extends CstParser {
     $.RULE("atomicExpression", () =>
       $.OR([
         { ALT: () => $.SUBRULE($.parenthesisExpression) },
-        { ALT: () => $.CONSUME(StringLiteral) },
+        { ALT: () => $.CONSUME(DoubleLiteral) },
         { ALT: () => $.CONSUME(IntegerLiteral) },
+        { ALT: () => $.CONSUME(StringLiteral) },
         { ALT: () => $.SUBRULE($.functionCall) },
         // { ALT: () => $.SUBRULE($.functionName) },
       ])
@@ -815,6 +829,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
   }
 
   additionExpression(ctx: any) {
+    // console.log("additionExpression", ctx);
     let result = this.visit(ctx.lhs);
 
     // "rhs" key may be undefined as the grammar defines it as optional (MANY === zero or more).
@@ -952,8 +967,14 @@ class MoonBitInterpreter extends BaseCstVisitor {
     } else if (ctx.IntegerLiteral) {
       // If a key exists on the ctx, at least one element is guaranteed
       return new MoonBitValue(
-        parseInt(ctx.IntegerLiteral[0].image, 10),
+        Number.parseInt(ctx.IntegerLiteral[0].image, 10),
         MoonBitType.Int
+      );
+    } else if (ctx.DoubleLiteral) {
+      // If a key exists on the ctx, at least one element is guaranteed
+      return new MoonBitValue(
+        Number.parseFloat(ctx.DoubleLiteral[0].image),
+        MoonBitType.Double
       );
     } else if (ctx.functionCall) {
       // If a key exists on the ctx, at least one element is guaranteed
@@ -979,7 +1000,7 @@ class MoonBitInterpreter extends BaseCstVisitor {
         // );
         // console.log(result)
 
-        if (func.type === MoonBitType.Function) {
+        if (func instanceof MoonBitFunction) {
           // this.callFunction(func, result);
           // console.log("func", func);
           result = func.value(result); // Call the function with the result
@@ -1237,5 +1258,8 @@ let strictMode = false;
 //   a = a + 1
 //  println(a)
 // }`); // 输出 1 到 10
+
+// const vm = new MoonBitVM();
+// vm.eval("1.1+1.0 |> println"); // 输出 2.1
 
 export { MoonBitVM, strictMode };

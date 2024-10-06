@@ -21,9 +21,9 @@ Progress:
 - [x] Types Check
 - [x] Multiline Input
 - [x] Functions
-- [ ] While Statement
+- [x] While Statement
+- [ ] For Statement
 - [ ] Enum
 - [ ] Struct
-- [ ] For Statement
 - [ ] Loop Statement
 - [ ] Match Statement
